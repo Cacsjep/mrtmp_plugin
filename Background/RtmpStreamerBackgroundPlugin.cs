@@ -111,8 +111,10 @@ namespace RtmpStreamerPlugin.Background
                     if (string.IsNullOrEmpty(rtmpUrl)) continue;
 
                     var cameraName = item.Properties.ContainsKey("CameraName") ? item.Properties["CameraName"] : "";
+                    var allowUntrustedCerts = item.Properties.ContainsKey("AllowUntrustedCerts")
+                        && item.Properties["AllowUntrustedCerts"] == "Yes";
 
-                    LaunchHelper(item.FQID.ObjectId, cameraId, cameraName, rtmpUrl);
+                    LaunchHelper(item.FQID.ObjectId, cameraId, cameraName, rtmpUrl, allowUntrustedCerts);
                 }
 
                 _lastConfigSnapshot = GetConfigSnapshot();
@@ -125,7 +127,7 @@ namespace RtmpStreamerPlugin.Background
             }
         }
 
-        private void LaunchHelper(Guid itemId, Guid cameraId, string cameraName, string rtmpUrl)
+        private void LaunchHelper(Guid itemId, Guid cameraId, string cameraName, string rtmpUrl, bool allowUntrustedCerts = false)
         {
             if (_helpers.TryRemove(itemId, out var existing))
                 KillHelper(existing);
@@ -137,7 +139,7 @@ namespace RtmpStreamerPlugin.Background
                 var psi = new ProcessStartInfo
                 {
                     FileName = _helperExePath,
-                    Arguments = $"\"{_serverUri}\" \"{cameraId}\" \"{rtmpUrl}\" \"{_milestoneDir}\"",
+                    Arguments = $"\"{_serverUri}\" \"{cameraId}\" \"{rtmpUrl}\" \"{_milestoneDir}\" \"{(allowUntrustedCerts ? "true" : "false")}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     RedirectStandardError = true
@@ -157,6 +159,7 @@ namespace RtmpStreamerPlugin.Background
                     CameraId = cameraId,
                     CameraName = cameraName,
                     RtmpUrl = rtmpUrl,
+                    AllowUntrustedCerts = allowUntrustedCerts,
                     StartTime = DateTime.UtcNow,
                     RestartCount = 0
                 };
@@ -230,7 +233,7 @@ namespace RtmpStreamerPlugin.Background
                         try { helper.Process?.Dispose(); } catch { }
 
                         var restartCount = helper.RestartCount + 1;
-                        LaunchHelper(itemId, helper.CameraId, helper.CameraName, helper.RtmpUrl);
+                        LaunchHelper(itemId, helper.CameraId, helper.CameraName, helper.RtmpUrl, helper.AllowUntrustedCerts);
 
                         if (_helpers.TryGetValue(itemId, out var newHelper))
                             newHelper.RestartCount = restartCount;
@@ -296,6 +299,7 @@ namespace RtmpStreamerPlugin.Background
                     if (item.Properties.ContainsKey("CameraId")) sb.Append(item.Properties["CameraId"]);
                     if (item.Properties.ContainsKey("RtmpUrl")) sb.Append(item.Properties["RtmpUrl"]);
                     if (item.Properties.ContainsKey("Enabled")) sb.Append(item.Properties["Enabled"]);
+                    if (item.Properties.ContainsKey("AllowUntrustedCerts")) sb.Append(item.Properties["AllowUntrustedCerts"]);
                     sb.Append("|");
                 }
                 return sb.ToString();
@@ -358,6 +362,7 @@ namespace RtmpStreamerPlugin.Background
             public Guid CameraId;
             public string CameraName;
             public string RtmpUrl;
+            public bool AllowUntrustedCerts;
             public DateTime StartTime;
             public int RestartCount;
             public long Frames;

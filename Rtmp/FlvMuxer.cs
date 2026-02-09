@@ -151,6 +151,35 @@ namespace RtmpStreamerPlugin.Rtmp
         }
 
         /// <summary>
+        /// Build the AAC audio sequence header FLV tag payload.
+        /// Must be sent before any audio data frames.
+        /// FLV AudioTagHeader: SoundFormat=10(AAC), Rate=3(44kHz), Size=1(16bit), Type=1(stereo) = 0xAF
+        /// </summary>
+        public byte[] BuildAudioSequenceHeader()
+        {
+            var asc = SilentAacGenerator.AudioSpecificConfig;
+            var tag = new byte[2 + asc.Length];
+            tag[0] = 0xAF; // AAC, 44kHz, 16-bit, stereo
+            tag[1] = 0x00; // AACPacketType = 0 (sequence header)
+            Buffer.BlockCopy(asc, 0, tag, 2, asc.Length);
+            return tag;
+        }
+
+        /// <summary>
+        /// Build a silent AAC audio frame as FLV tag payload.
+        /// Returns the same bytes every call (can be cached by caller).
+        /// </summary>
+        public byte[] BuildSilentAudioFrame()
+        {
+            var frame = SilentAacGenerator.SilentFrame;
+            var tag = new byte[2 + frame.Length];
+            tag[0] = 0xAF; // AAC, 44kHz, 16-bit, stereo
+            tag[1] = 0x01; // AACPacketType = 1 (raw)
+            Buffer.BlockCopy(frame, 0, tag, 2, frame.Length);
+            return tag;
+        }
+
+        /// <summary>
         /// Reset state (e.g., on reconnect).
         /// </summary>
         public void Reset()

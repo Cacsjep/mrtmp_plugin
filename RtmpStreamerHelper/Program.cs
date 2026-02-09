@@ -24,6 +24,8 @@ namespace RtmpStreamerHelper
             string serverUri = args[0];
             string cameraIdStr = args[1];
             string rtmpUrl = args[2];
+            bool allowUntrustedCerts = args.Length >= 5
+                && string.Equals(args[4], "true", StringComparison.OrdinalIgnoreCase);
 
             // Set up assembly resolution BEFORE any Milestone code runs
             _assemblySearchDirs = BuildSearchDirs(args.Length >= 4 ? args[3] : null);
@@ -79,7 +81,7 @@ namespace RtmpStreamerHelper
                 PluginLog.Info($"Camera resolved: {cameraItem.Name}");
 
                 // Start streaming
-                session = new StreamSession(cameraItem, rtmpUrl);
+                session = new StreamSession(cameraItem, rtmpUrl, allowUntrustedCerts);
                 session.Start();
 
                 PluginLog.Info("Stream session started, waiting for exit signal...");

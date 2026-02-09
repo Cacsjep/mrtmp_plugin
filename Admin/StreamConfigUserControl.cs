@@ -87,6 +87,10 @@ namespace RtmpStreamerPlugin.Admin
             _chkEnabled.Checked = !item.Properties.ContainsKey("Enabled")
                 || item.Properties["Enabled"] != "No";
 
+            // Load allow untrusted certs
+            _chkAllowUntrustedCerts.Checked = item.Properties.ContainsKey("AllowUntrustedCerts")
+                && item.Properties["AllowUntrustedCerts"] == "Yes";
+
             // Load status
             RefreshStatusFromItem(item);
         }
@@ -124,6 +128,7 @@ namespace RtmpStreamerPlugin.Admin
             item.Properties["RtmpUrl"] = _txtRtmpUrl.Text.Trim();
 
             item.Properties["Enabled"] = _chkEnabled.Checked ? "Yes" : "No";
+            item.Properties["AllowUntrustedCerts"] = _chkAllowUntrustedCerts.Checked ? "Yes" : "No";
         }
 
         public void ClearContent()
@@ -134,6 +139,7 @@ namespace RtmpStreamerPlugin.Admin
             _btnSelectCamera.Text = "(Select camera...)";
             _txtRtmpUrl.Text = "";
             _chkEnabled.Checked = true;
+            _chkAllowUntrustedCerts.Checked = false;
             _lblStatusValue.Text = "-";
             _lblUptimeValue.Text = "-";
         }

@@ -58,6 +58,7 @@
     <Compile Include="..\Rtmp\Amf0.cs" Link="Rtmp\Amf0.cs" />
     <Compile Include="..\Rtmp\RtmpPublisher.cs" Link="Rtmp\RtmpPublisher.cs" />
     <Compile Include="..\Rtmp\FlvMuxer.cs" Link="Rtmp\FlvMuxer.cs" />
+    <Compile Include="..\Rtmp\SilentAacGenerator.cs" Link="Rtmp\SilentAacGenerator.cs" />
     <Compile Include="..\Rtmp\RtmpChunkWriter.cs" Link="Rtmp\RtmpChunkWriter.cs" />
     <Compile Include="..\Streaming\CameraFrameSource.cs" Link="Streaming\CameraFrameSource.cs" />
     <Compile Include="..\Streaming\GenericByteDataParser.cs" Link="Streaming\GenericByteDataParser.cs" />

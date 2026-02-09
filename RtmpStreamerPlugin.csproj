@@ -72,6 +72,7 @@
     <Compile Include="Rtmp\Amf0.cs" />
     <Compile Include="Rtmp\RtmpPublisher.cs" />
     <Compile Include="Rtmp\FlvMuxer.cs" />
+    <Compile Include="Rtmp\SilentAacGenerator.cs" />
     <Compile Include="Rtmp\RtmpChunkWriter.cs" />
   </ItemGroup>
   <ItemGroup>

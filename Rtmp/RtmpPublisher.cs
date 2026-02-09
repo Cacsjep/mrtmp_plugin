@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 namespace RtmpStreamerPlugin.Rtmp
@@ -23,6 +25,8 @@ namespace RtmpStreamerPlugin.Rtmp
 
         private TcpClient _tcpClient;
         private NetworkStream _netStream;
+        private SslStream _sslStream;
+        private Stream _readStream;  // points to _netStream or _sslStream for all reads
         private BufferedStream _bufferedStream;
         private RtmpChunkWriter _chunkWriter;
         private readonly object _writeLock = new object();
@@ -31,6 +35,7 @@ namespace RtmpStreamerPlugin.Rtmp
         private int _port;
         private string _app;
         private string _streamKey;
+        private bool _useTls;
 
         private bool _connected;
         private bool _publishing;
@@ -39,20 +44,23 @@ namespace RtmpStreamerPlugin.Rtmp
         // Chunk stream IDs for different message types
         private const int CsidProtocol = 2;
         private const int CsidCommand = 3;
+        private const int CsidAudio = 4;
         private const int CsidVideo = 6;
 
         // Track timestamps for delta encoding
         private uint _lastVideoTimestamp;
         private bool _firstVideoMessage = true;
+        private uint _lastAudioTimestamp;
+        private bool _firstAudioMessage = true;
 
         public bool IsConnected => _connected;
         public bool IsPublishing => _publishing;
 
         /// <summary>
-        /// Connect to an RTMP server and start publishing.
-        /// URL format: rtmp://host:port/app/streamkey
+        /// Connect to an RTMP/RTMPS server and start publishing.
+        /// URL format: rtmp://host:port/app/streamkey or rtmps://host:port/app/streamkey
         /// </summary>
-        public void Connect(string rtmpUrl)
+        public void Connect(string rtmpUrl, bool allowUntrustedCerts = false)
         {
             ParseUrl(rtmpUrl);
 
@@ -64,7 +72,24 @@ namespace RtmpStreamerPlugin.Rtmp
             _tcpClient.Connect(_host, _port);
 
             _netStream = _tcpClient.GetStream();
-            _bufferedStream = new BufferedStream(_netStream, 64 * 1024);
+
+            if (_useTls)
+            {
+                _sslStream = new SslStream(_netStream, false, (sender, cert, chain, errors) =>
+                {
+                    if (allowUntrustedCerts) return true;
+                    return errors == SslPolicyErrors.None;
+                });
+                _sslStream.AuthenticateAsClient(_host);
+                _readStream = _sslStream;
+                _bufferedStream = new BufferedStream(_sslStream, 64 * 1024);
+            }
+            else
+            {
+                _readStream = _netStream;
+                _bufferedStream = new BufferedStream(_netStream, 64 * 1024);
+            }
+
             _chunkWriter = new RtmpChunkWriter(_bufferedStream);
 
             PerformHandshake();
@@ -86,6 +111,32 @@ namespace RtmpStreamerPlugin.Rtmp
             _chunkWriter.ChunkSize = OutputChunkSize;
 
             _publishing = true;
+        }
+
+        /// <summary>
+        /// Send an audio frame as an FLV audio tag payload (RTMP message type 8).
+        /// </summary>
+        public void SendAudioData(byte[] flvAudioTagPayload, uint timestampMs)
+        {
+            if (!_publishing)
+                throw new InvalidOperationException("Not publishing");
+
+            lock (_writeLock)
+            {
+                if (_firstAudioMessage)
+                {
+                    _chunkWriter.WriteMessage(CsidAudio, 8, _streamId, timestampMs, flvAudioTagPayload);
+                    _lastAudioTimestamp = timestampMs;
+                    _firstAudioMessage = false;
+                }
+                else
+                {
+                    uint delta = timestampMs - _lastAudioTimestamp;
+                    _chunkWriter.WriteMessageDelta(CsidAudio, 8, delta, flvAudioTagPayload);
+                    _lastAudioTimestamp = timestampMs;
+                }
+                _chunkWriter.Flush();
+            }
         }
 
         /// <summary>
@@ -124,6 +175,8 @@ namespace RtmpStreamerPlugin.Rtmp
             _connected = false;
             _firstVideoMessage = true;
             _lastVideoTimestamp = 0;
+            _firstAudioMessage = true;
+            _lastAudioTimestamp = 0;
 
             try
             {
@@ -136,10 +189,13 @@ namespace RtmpStreamerPlugin.Rtmp
             catch { }
 
             try { _bufferedStream?.Dispose(); } catch { }
+            try { _sslStream?.Dispose(); } catch { }
             try { _netStream?.Dispose(); } catch { }
             try { _tcpClient?.Close(); } catch { }
 
             _bufferedStream = null;
+            _sslStream = null;
+            _readStream = null;
             _netStream = null;
             _tcpClient = null;
             _chunkWriter = null;
@@ -154,12 +210,26 @@ namespace RtmpStreamerPlugin.Rtmp
 
         private void ParseUrl(string url)
         {
-            // Format: rtmp://host:port/app/streamkey
-            // or:     rtmp://host/app/streamkey (default port 1935)
-            if (!url.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("URL must start with rtmp://");
+            // Format: rtmp://host:port/app/streamkey  or  rtmps://host:port/app/streamkey
+            int defaultPort;
+            string remainder;
 
-            string remainder = url.Substring(7); // strip rtmp://
+            if (url.StartsWith("rtmps://", StringComparison.OrdinalIgnoreCase))
+            {
+                _useTls = true;
+                defaultPort = 443;
+                remainder = url.Substring(8); // strip rtmps://
+            }
+            else if (url.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase))
+            {
+                _useTls = false;
+                defaultPort = 1935;
+                remainder = url.Substring(7); // strip rtmp://
+            }
+            else
+            {
+                throw new ArgumentException("URL must start with rtmp:// or rtmps://");
+            }
 
             // Split host:port from path
             int slashIdx = remainder.IndexOf('/');
@@ -179,7 +249,7 @@ namespace RtmpStreamerPlugin.Rtmp
             else
             {
                 _host = hostPort;
-                _port = 1935;
+                _port = defaultPort;
             }
 
             // Split path into app and stream key
@@ -205,7 +275,7 @@ namespace RtmpStreamerPlugin.Rtmp
         private void PerformHandshake()
         {
             // Send C0 (version 3) + C1 (1536 bytes: timestamp + zeros + random)
-            _netStream.WriteByte(3);
+            _readStream.WriteByte(3);
 
             var c1 = new byte[HandshakeSize];
             var rng = new Random();
@@ -214,11 +284,11 @@ namespace RtmpStreamerPlugin.Rtmp
             c1[0] = 0; c1[1] = 0; c1[2] = 0; c1[3] = 0;
             // Zero
             c1[4] = 0; c1[5] = 0; c1[6] = 0; c1[7] = 0;
-            _netStream.Write(c1, 0, HandshakeSize);
-            _netStream.Flush();
+            _readStream.Write(c1, 0, HandshakeSize);
+            _readStream.Flush();
 
             // Read S0 + S1 + S2
-            int s0 = _netStream.ReadByte();
+            int s0 = _readStream.ReadByte();
             if (s0 < 0) throw new IOException("Connection closed during handshake");
             if (s0 != 3) throw new InvalidDataException($"Unsupported RTMP version from server: {s0}");
 
@@ -226,8 +296,8 @@ namespace RtmpStreamerPlugin.Rtmp
             byte[] s2 = ReadExact(HandshakeSize);
 
             // Send C2 (echo of S1)
-            _netStream.Write(s1, 0, HandshakeSize);
-            _netStream.Flush();
+            _readStream.Write(s1, 0, HandshakeSize);
+            _readStream.Flush();
         }
 
         #endregion
@@ -251,7 +321,7 @@ namespace RtmpStreamerPlugin.Rtmp
                 {"app", _app},
                 {"type", "nonprivate"},
                 {"flashVer", "FMLE/3.0 (compatible; FMSc/1.0)"},
-                {"tcUrl", $"rtmp://{_host}:{_port}/{_app}"}
+                {"tcUrl", $"{(_useTls ? "rtmps" : "rtmp")}://{_host}:{_port}/{_app}"}
             });
 
             lock (_writeLock)
@@ -490,7 +560,7 @@ namespace RtmpStreamerPlugin.Rtmp
         {
             while (true)
             {
-                int firstByte = _netStream.ReadByte();
+                int firstByte = _readStream.ReadByte();
                 if (firstByte < 0) return null;
 
                 int fmt = (firstByte >> 6) & 0x03;
@@ -593,7 +663,7 @@ namespace RtmpStreamerPlugin.Rtmp
             int total = 0;
             while (total < count)
             {
-                int read = _netStream.Read(buffer, offset + total, count - total);
+                int read = _readStream.Read(buffer, offset + total, count - total);
                 if (read <= 0) throw new IOException("Connection closed");
                 total += read;
             }
@@ -601,7 +671,7 @@ namespace RtmpStreamerPlugin.Rtmp
 
         private int ReadOneByte()
         {
-            int b = _netStream.ReadByte();
+            int b = _readStream.ReadByte();
             if (b < 0) throw new IOException("Connection closed");
             return b;
         }

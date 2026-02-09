@@ -16,6 +16,7 @@ namespace RtmpStreamerPlugin.Streaming
         private readonly object _lock = new object();
         private long _eventsReceived;
         private long _framesEmitted;
+        private bool _codecErrorLogged;
 
         /// <summary>
         /// Fired when a new H.264 frame is received from the camera.
@@ -115,7 +116,21 @@ namespace RtmpStreamerPlugin.Streaming
                     return;
 
                 if (frame.CodecType != GenericByteDataParser.CodecH264)
+                {
+                    if (!_codecErrorLogged)
+                    {
+                        _codecErrorLogged = true;
+                        string codecName;
+                        switch (frame.CodecType)
+                        {
+                            case GenericByteDataParser.CodecH265: codecName = "H.265"; break;
+                            case GenericByteDataParser.CodecJpeg: codecName = "JPEG"; break;
+                            default: codecName = $"0x{frame.CodecType:X4}"; break;
+                        }
+                        Error?.Invoke($"Camera is using {codecName} codec. Only H.264 is supported for RTMP streaming. Please change the camera codec to H.264 in the Recording Server.");
+                    }
                     return;
+                }
 
                 _framesEmitted++;
                 if (_framesEmitted == 1)

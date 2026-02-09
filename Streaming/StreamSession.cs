@@ -18,6 +18,7 @@ namespace RtmpStreamerPlugin.Streaming
         private readonly Item _cameraItem;
         private readonly string _rtmpUrl;
         private readonly string _sessionId;
+        private readonly bool _allowUntrustedCerts;
 
         private Thread _reconnectThread;
         private CancellationTokenSource _cts;
@@ -25,6 +26,11 @@ namespace RtmpStreamerPlugin.Streaming
         private DateTime _startTime;
         private DateTime _streamEpoch;
         private bool _streamEpochSet;
+
+        // Silent audio
+        private bool _audioHeaderSent;
+        private byte[] _silentAudioFrame;
+        private uint _nextAudioTimestamp;
 
         // Stats
         private long _framesSent;
@@ -43,10 +49,11 @@ namespace RtmpStreamerPlugin.Streaming
         public string LastError => _lastError;
         public TimeSpan Uptime => _running ? DateTime.UtcNow - _startTime : TimeSpan.Zero;
 
-        public StreamSession(Item cameraItem, string rtmpUrl)
+        public StreamSession(Item cameraItem, string rtmpUrl, bool allowUntrustedCerts = false)
         {
             _cameraItem = cameraItem ?? throw new ArgumentNullException(nameof(cameraItem));
             _rtmpUrl = rtmpUrl ?? throw new ArgumentNullException(nameof(rtmpUrl));
+            _allowUntrustedCerts = allowUntrustedCerts;
             _sessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
         }
 
@@ -65,6 +72,7 @@ namespace RtmpStreamerPlugin.Streaming
             _keyFramesSent = 0;
             _lastError = null;
             _streamEpochSet = false;
+            _audioHeaderSent = false;
 
             _reconnectThread = new Thread(RunLoop)
             {
@@ -110,7 +118,7 @@ namespace RtmpStreamerPlugin.Streaming
                     _frameSource = new CameraFrameSource();
 
                     // Connect to RTMP server
-                    _publisher.Connect(_rtmpUrl);
+                    _publisher.Connect(_rtmpUrl, _allowUntrustedCerts);
                     Log("RTMP connected, starting camera frame source");
 
                     // Start camera frame source
@@ -138,6 +146,7 @@ namespace RtmpStreamerPlugin.Streaming
                     Log("Reconnecting in 5 seconds...");
                     _cts.Token.WaitHandle.WaitOne(5000);
                     _streamEpochSet = false;
+                    _audioHeaderSent = false;
                 }
             }
         }
@@ -168,6 +177,27 @@ namespace RtmpStreamerPlugin.Streaming
                     Log($"Sending AVC sequence header ({sequenceHeader.Length} bytes)");
                     _publisher.SendVideoData(sequenceHeader, rtmpTimestamp);
                     _bytesSent += sequenceHeader.Length;
+
+                    // Send AAC audio sequence header right after video sequence header
+                    if (!_audioHeaderSent)
+                    {
+                        var audioSeqHeader = _muxer.BuildAudioSequenceHeader();
+                        _publisher.SendAudioData(audioSeqHeader, rtmpTimestamp);
+                        _silentAudioFrame = _muxer.BuildSilentAudioFrame();
+                        _audioHeaderSent = true;
+                        _nextAudioTimestamp = rtmpTimestamp;
+                        Log("Sent AAC audio sequence header (silent track)");
+                    }
+                }
+
+                // Interleave silent audio frames to keep audio timeline in sync
+                if (_audioHeaderSent)
+                {
+                    while (_nextAudioTimestamp <= rtmpTimestamp)
+                    {
+                        _publisher.SendAudioData(_silentAudioFrame, _nextAudioTimestamp);
+                        _nextAudioTimestamp += 23; // ~23ms per AAC frame (1024 samples / 44100 Hz)
+                    }
                 }
 
                 // Send the video frame
