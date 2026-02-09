@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:forum.milestonesys.com)",
+      "Bash(find:*)"
+    ]
+  }
+}

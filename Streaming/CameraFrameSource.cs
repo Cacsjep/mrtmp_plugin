@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using VideoOS.Platform;
 using VideoOS.Platform.Live;
 
@@ -44,9 +45,14 @@ namespace RtmpStreamerPlugin.Streaming
         {
             _cameraItem = cameraItem ?? throw new ArgumentNullException(nameof(cameraItem));
 
+            PluginLog.Info($"[FrameSource] Creating RawLiveSource for camera: {_cameraItem.Name}, FQID={_cameraItem.FQID}");
+
             _rawSource = new RawLiveSource(_cameraItem);
             _rawSource.LiveContentEvent += OnLiveContent;
+            _rawSource.LiveStatusEvent += OnLiveStatus;
             _rawSource.Init();
+
+            PluginLog.Info($"[FrameSource] RawLiveSource initialized, setting LiveModeStart=true");
         }
 
         /// <summary>
@@ -81,9 +87,29 @@ namespace RtmpStreamerPlugin.Streaming
             if (_rawSource != null)
             {
                 _rawSource.LiveContentEvent -= OnLiveContent;
+                _rawSource.LiveStatusEvent -= OnLiveStatus;
                 _rawSource.Close();
                 _rawSource = null;
             }
+        }
+
+        private void OnLiveStatus(object sender, EventArgs e)
+        {
+            try
+            {
+                PluginLog.Info($"[FrameSource] LiveStatusEvent: {e.GetType().Name}");
+                // Dump all properties
+                foreach (var prop in e.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    try
+                    {
+                        var val = prop.GetValue(e);
+                        PluginLog.Info($"[FrameSource]   Status.{prop.Name} = {val}");
+                    }
+                    catch { }
+                }
+            }
+            catch { }
         }
 
         private void OnLiveContent(object sender, EventArgs e)
@@ -94,6 +120,29 @@ namespace RtmpStreamerPlugin.Streaming
 
                 if (_eventsReceived <= 3 || _eventsReceived % 500 == 0)
                     PluginLog.Info($"[FrameSource] Event #{_eventsReceived}, EventArgs type={e.GetType().Name}");
+
+                // On first event, dump all properties and fields
+                if (_eventsReceived == 1)
+                {
+                    foreach (var prop in e.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                    {
+                        try
+                        {
+                            var val = prop.GetValue(e);
+                            PluginLog.Info($"[FrameSource]   Prop {prop.Name} ({prop.PropertyType.Name}) = {val}");
+                        }
+                        catch (Exception ex2) { PluginLog.Info($"[FrameSource]   Prop {prop.Name} -> error: {ex2.Message}"); }
+                    }
+                    foreach (var field in e.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
+                    {
+                        try
+                        {
+                            var val = field.GetValue(e);
+                            PluginLog.Info($"[FrameSource]   Field {field.Name} ({field.FieldType.Name}) = {val}");
+                        }
+                        catch (Exception ex2) { PluginLog.Info($"[FrameSource]   Field {field.Name} -> error: {ex2.Message}"); }
+                    }
+                }
 
                 var args = e as LiveContentRawEventArgs;
                 if (args == null)
