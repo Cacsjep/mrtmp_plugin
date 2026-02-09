@@ -15,7 +15,7 @@ namespace RtmpStreamerPlugin.Admin
         private Item _selectedCameraItem;
         private Timer _refreshTimer;
 
-        public event EventHandler ConfigurationChangedByUser;
+        internal event EventHandler ConfigurationChangedByUser;
 
         public StreamConfigUserControl()
         {
@@ -139,9 +139,10 @@ namespace RtmpStreamerPlugin.Admin
             }
         }
 
-        private void OnUserChange(object sender, EventArgs e)
+        internal void OnUserChange(object sender, EventArgs e)
         {
-            ConfigurationChangedByUser?.Invoke(this, EventArgs.Empty);
+            if (ConfigurationChangedByUser != null)
+                ConfigurationChangedByUser(this, new EventArgs());
         }
 
         private void RefreshStatus()

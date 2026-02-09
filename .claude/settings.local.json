@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:forum.milestonesys.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(for dir in \"AdminMultiTab\" \"AdminTabHardwarePlugin\" \"AdminTabPlugin\" \"BatAction\" \"Chat\" \"ChatWithWebsockets\" \"ConfigDump\" \"LicenseRegistration\" \"Property\" \"SensorMonitor\" \"ServerConnectionLicense\" \"ServerSideCarrousel\" \"ServiceTest\" \"SiteLicense\" \"VideoPreview\")",
+      "Bash(do echo \"=== $dir ===\" ls -la \"C:\\\\Users\\\\admin\\\\Downloads\\\\mipsdk-samples-plugin-main\\\\mipsdk-samples-plugin-main/$dir/Admin/\")"
     ]
   }
 }

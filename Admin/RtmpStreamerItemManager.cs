@@ -26,39 +26,34 @@ namespace RtmpStreamerPlugin.Admin
         public override UserControl GenerateDetailUserControl()
         {
             _userControl = new StreamConfigUserControl();
-            _userControl.ConfigurationChangedByUser += OnConfigurationChangedByUser;
+            _userControl.ConfigurationChangedByUser += new EventHandler(ConfigurationChangedByUserHandler);
             return _userControl;
-        }
-
-        private void OnConfigurationChangedByUser(object sender, EventArgs e)
-        {
-            if (CurrentItem != null && _userControl != null)
-            {
-                _userControl.UpdateItem(CurrentItem);
-                Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
-            }
         }
 
         public override void ReleaseUserControl()
         {
+            if (_userControl != null)
+                _userControl.ConfigurationChangedByUser -= new EventHandler(ConfigurationChangedByUserHandler);
             _userControl = null;
         }
 
         public override void FillUserControl(Item item)
         {
             CurrentItem = item;
-            _userControl?.FillContent(item);
+            if (_userControl != null)
+                _userControl.FillContent(item);
         }
 
         public override void ClearUserControl()
         {
             CurrentItem = null;
-            _userControl?.ClearContent();
+            if (_userControl != null)
+                _userControl.ClearContent();
         }
 
         public override bool ValidateAndSaveUserControl()
         {
-            if (CurrentItem != null && _userControl != null)
+            if (CurrentItem != null)
             {
                 _userControl.UpdateItem(CurrentItem);
                 Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
@@ -106,7 +101,9 @@ namespace RtmpStreamerPlugin.Admin
             CurrentItem = new Item(suggestedFQID, "New RTMP Stream");
             CurrentItem.Properties["Enabled"] = "Yes";
 
-            _userControl?.FillContent(CurrentItem);
+            if (_userControl != null)
+                _userControl.FillContent(CurrentItem);
+
             Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
             return CurrentItem;
         }
