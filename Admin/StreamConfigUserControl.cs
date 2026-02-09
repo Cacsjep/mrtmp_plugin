@@ -4,33 +4,23 @@ using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
 using System.Xml.Linq;
-using RtmpStreamerPlugin.Streaming;
 using VideoOS.Platform;
 using VideoOS.Platform.UI;
 
 namespace RtmpStreamerPlugin.Admin
 {
-    /// <summary>
-    /// WinForms user control for configuring RTMP streams in the Management Client.
-    /// Allows adding/removing camera-to-RTMP-URL mappings.
-    /// </summary>
     public partial class StreamConfigUserControl : UserControl
     {
-        private Item _selectedCameraItem;
         private Item _currentItem;
-        private List<StreamEntry> _streams = new List<StreamEntry>();
+        private Item _selectedCameraItem;
         private Timer _refreshTimer;
 
-        /// <summary>
-        /// Fired when the user changes the configuration.
-        /// </summary>
-        public event EventHandler ConfigurationChanged;
+        public event EventHandler ConfigurationChangedByUser;
 
         public StreamConfigUserControl()
         {
             InitializeComponent();
 
-            // Auto-refresh status every 1 second
             _refreshTimer = new Timer { Interval = 1000 };
             _refreshTimer.Tick += (s, e) => RefreshStatus();
             _refreshTimer.Start();
@@ -47,178 +37,89 @@ namespace RtmpStreamerPlugin.Admin
             base.Dispose(disposing);
         }
 
-        /// <summary>
-        /// Load configuration from an Item's properties into the UI.
-        /// </summary>
+        public string DisplayName => _txtName.Text;
+
         public void FillContent(Item item)
         {
             _currentItem = item;
-            _streams.Clear();
-
             if (item == null)
             {
-                RefreshGrid();
+                ClearContent();
                 return;
             }
 
-            LoadStreamsFromItem(item);
-            RefreshGrid();
-        }
+            _txtName.Text = item.Name;
 
-        private void LoadStreamsFromItem(Item item)
-        {
-            // Read helper status written by BackgroundPlugin
-            var helperStatus = ParseHelperStatus(item);
-
-            if (item.Properties.ContainsKey("StreamConfig"))
+            // Load camera
+            if (item.Properties.ContainsKey("CameraId"))
             {
-                string xml = item.Properties["StreamConfig"];
-                var configs = StreamSessionManager.LoadConfigXml(xml);
-                foreach (var config in configs)
+                var cameraIdStr = item.Properties["CameraId"];
+                if (Guid.TryParse(cameraIdStr, out var cameraId) && cameraId != Guid.Empty)
                 {
-                    var entry = new StreamEntry
+                    var cameraItem = Configuration.Instance.GetItem(cameraId, Kind.Camera);
+                    if (cameraItem != null)
                     {
-                        CameraId = config.CameraId,
-                        CameraName = config.CameraName,
-                        RtmpUrl = config.RtmpUrl,
-                        AutoStart = config.AutoStart,
-                        Status = "Configured",
-                        Fps = "-",
-                        Uptime = "-"
-                    };
-
-                    if (helperStatus.TryGetValue(config.CameraId, out var hs))
-                    {
-                        entry.Status = hs.Status;
-                        if (hs.Restarts > 0)
-                            entry.Status += $" (R:{hs.Restarts})";
-                        if (hs.Fps > 0)
-                            entry.Fps = hs.Fps.ToString("F1");
-                        if (hs.Uptime.TotalSeconds > 0)
-                            entry.Uptime = hs.Uptime.ToString(@"hh\:mm\:ss");
+                        _selectedCameraItem = cameraItem;
+                        _btnSelectCamera.Text = cameraItem.Name;
                     }
-
-                    _streams.Add(entry);
-                }
-            }
-        }
-
-        private static Dictionary<Guid, HelperStatusEntry> ParseHelperStatus(Item item)
-        {
-            var result = new Dictionary<Guid, HelperStatusEntry>();
-
-            if (!item.Properties.ContainsKey("StreamStatus"))
-                return result;
-
-            try
-            {
-                var statusRoot = XElement.Parse(item.Properties["StreamStatus"]);
-                foreach (var elem in statusRoot.Elements("Helper"))
-                {
-                    var cameraId = Guid.Parse(elem.Attribute("CameraId")?.Value ?? Guid.Empty.ToString());
-                    var entry = new HelperStatusEntry
+                    else
                     {
-                        Status = elem.Attribute("Status")?.Value ?? "Unknown",
-                        Restarts = int.Parse(elem.Attribute("Restarts")?.Value ?? "0")
-                    };
-
-                    long.TryParse(elem.Attribute("Frames")?.Value, out entry.Frames);
-                    double.TryParse(elem.Attribute("Fps")?.Value, NumberStyles.Float,
-                        CultureInfo.InvariantCulture, out entry.Fps);
-
-                    if (DateTime.TryParse(elem.Attribute("StartTime")?.Value, CultureInfo.InvariantCulture,
-                        DateTimeStyles.RoundtripKind, out var startTime))
-                    {
-                        entry.Uptime = DateTime.UtcNow - startTime;
-                    }
-
-                    result[cameraId] = entry;
-                }
-            }
-            catch { }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Refresh status from server without reloading stream config.
-        /// </summary>
-        private void RefreshStatus()
-        {
-            if (_currentItem == null || _streams.Count == 0)
-                return;
-
-            try
-            {
-                // Re-read the item to get fresh status
-                var freshItem = Configuration.Instance.GetItemConfiguration(
-                    RtmpStreamerPluginDefinition.PluginId,
-                    RtmpStreamerPluginDefinition.PluginKindId,
-                    _currentItem.FQID.ObjectId);
-
-                if (freshItem == null) return;
-
-                var helperStatus = ParseHelperStatus(freshItem);
-                if (helperStatus.Count == 0) return;
-
-                bool changed = false;
-                foreach (var entry in _streams)
-                {
-                    if (helperStatus.TryGetValue(entry.CameraId, out var hs))
-                    {
-                        var newStatus = hs.Status;
-                        if (hs.Restarts > 0) newStatus += $" (R:{hs.Restarts})";
-                        var newFps = hs.Fps > 0 ? hs.Fps.ToString("F1") : "-";
-                        var newUptime = hs.Uptime.TotalSeconds > 0 ? hs.Uptime.ToString(@"hh\:mm\:ss") : "-";
-
-                        if (entry.Status != newStatus || entry.Fps != newFps || entry.Uptime != newUptime)
-                        {
-                            entry.Status = newStatus;
-                            entry.Fps = newFps;
-                            entry.Uptime = newUptime;
-                            changed = true;
-                        }
+                        _btnSelectCamera.Text = item.Properties.ContainsKey("CameraName")
+                            ? item.Properties["CameraName"] + " (not found)"
+                            : "(Camera not found)";
                     }
                 }
-
-                if (changed)
-                    RefreshGrid();
+                else
+                {
+                    _btnSelectCamera.Text = "(Select camera...)";
+                }
             }
-            catch { }
+            else
+            {
+                _btnSelectCamera.Text = "(Select camera...)";
+            }
+
+            // Load RTMP URL
+            _txtRtmpUrl.Text = item.Properties.ContainsKey("RtmpUrl")
+                ? item.Properties["RtmpUrl"] : "";
+
+            // Load enabled state
+            _chkEnabled.Checked = !item.Properties.ContainsKey("Enabled")
+                || item.Properties["Enabled"] != "No";
+
+            // Load status
+            RefreshStatusFromItem(item);
         }
 
-        /// <summary>
-        /// Save the current configuration to the Item's properties.
-        /// </summary>
-        public void StoreProperties(Item item)
+        public void UpdateItem(Item item)
         {
             if (item == null) return;
 
-            var root = new XElement("RtmpStreams");
-            foreach (var entry in _streams)
+            item.Name = _txtName.Text;
+
+            if (_selectedCameraItem != null)
             {
-                root.Add(new XElement("Stream",
-                    new XAttribute("CameraId", entry.CameraId),
-                    new XAttribute("CameraName", entry.CameraName),
-                    new XAttribute("RtmpUrl", entry.RtmpUrl),
-                    new XAttribute("AutoStart", entry.AutoStart)
-                ));
+                item.Properties["CameraId"] = _selectedCameraItem.FQID.ObjectId.ToString();
+                item.Properties["CameraName"] = _selectedCameraItem.Name;
             }
 
-            item.Properties["StreamConfig"] = root.ToString();
+            var rtmpUrl = _txtRtmpUrl.Text.Trim();
+            if (!string.IsNullOrEmpty(rtmpUrl))
+                item.Properties["RtmpUrl"] = rtmpUrl;
+
+            item.Properties["Enabled"] = _chkEnabled.Checked ? "Yes" : "No";
         }
 
-        /// <summary>
-        /// Clear the UI.
-        /// </summary>
         public void ClearContent()
         {
             _currentItem = null;
-            _streams.Clear();
             _selectedCameraItem = null;
-            _txtCameraName.Text = "";
+            _txtName.Text = "";
+            _btnSelectCamera.Text = "(Select camera...)";
             _txtRtmpUrl.Text = "";
-            RefreshGrid();
+            _chkEnabled.Checked = true;
+            _lblStatusValue.Text = "-";
+            _lblUptimeValue.Text = "-";
         }
 
         private void BtnSelectCamera_Click(object sender, EventArgs e)
@@ -233,94 +134,60 @@ namespace RtmpStreamerPlugin.Admin
             if (form.ShowDialog() == true && form.SelectedItems != null && form.SelectedItems.Any())
             {
                 _selectedCameraItem = form.SelectedItems.First();
-                _txtCameraName.Text = _selectedCameraItem.Name;
+                _btnSelectCamera.Text = _selectedCameraItem.Name;
+                OnUserChange(sender, e);
             }
         }
 
-        private void BtnAddStream_Click(object sender, EventArgs e)
+        private void OnUserChange(object sender, EventArgs e)
         {
-            if (_selectedCameraItem == null)
-            {
-                MessageBox.Show("Please select a camera first.", "RTMP Streamer",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string rtmpUrl = _txtRtmpUrl.Text.Trim();
-            if (string.IsNullOrEmpty(rtmpUrl) || !rtmpUrl.StartsWith("rtmp://", StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show("Please enter a valid RTMP URL (e.g., rtmp://a.rtmp.youtube.com/live2/stream-key).",
-                    "RTMP Streamer", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            _streams.Add(new StreamEntry
-            {
-                CameraId = _selectedCameraItem.FQID.ObjectId,
-                CameraName = _selectedCameraItem.Name,
-                RtmpUrl = rtmpUrl,
-                AutoStart = true,
-                Status = "Pending",
-                Fps = "-",
-                Uptime = "-"
-            });
-
-            // Clear inputs
-            _selectedCameraItem = null;
-            _txtCameraName.Text = "";
-            _txtRtmpUrl.Text = "";
-
-            RefreshGrid();
-            ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+            ConfigurationChangedByUser?.Invoke(this, EventArgs.Empty);
         }
 
-        private void BtnRemove_Click(object sender, EventArgs e)
+        private void RefreshStatus()
         {
-            if (_dataGridView.SelectedRows.Count == 0)
-                return;
+            if (_currentItem == null) return;
 
-            int idx = _dataGridView.SelectedRows[0].Index;
-            if (idx >= 0 && idx < _streams.Count)
+            try
             {
-                _streams.RemoveAt(idx);
-                RefreshGrid();
-                ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+                var freshItem = Configuration.Instance.GetItemConfiguration(
+                    RtmpStreamerPluginDefinition.PluginId,
+                    RtmpStreamerPluginDefinition.PluginKindId,
+                    _currentItem.FQID.ObjectId);
+
+                if (freshItem != null)
+                    RefreshStatusFromItem(freshItem);
             }
+            catch { }
         }
 
-        private void RefreshGrid()
+        private void RefreshStatusFromItem(Item item)
         {
-            _dataGridView.Rows.Clear();
-            foreach (var entry in _streams)
+            var status = "-";
+            var uptime = "-";
+
+            if (item.Properties.ContainsKey("Status"))
+                status = item.Properties["Status"];
+
+            if (item.Properties.ContainsKey("StartTime"))
             {
-                _dataGridView.Rows.Add(
-                    entry.CameraName,
-                    entry.RtmpUrl,
-                    entry.Status,
-                    entry.Fps,
-                    entry.Uptime
-                );
+                if (DateTime.TryParse(item.Properties["StartTime"], CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var startTime))
+                {
+                    var elapsed = DateTime.UtcNow - startTime;
+                    if (elapsed.TotalSeconds > 0)
+                        uptime = elapsed.ToString(@"hh\:mm\:ss");
+                }
             }
-        }
 
-        private class StreamEntry
-        {
-            public Guid CameraId { get; set; }
-            public string CameraName { get; set; }
-            public string RtmpUrl { get; set; }
-            public bool AutoStart { get; set; }
-            public string Status { get; set; }
-            public string Fps { get; set; }
-            public string Uptime { get; set; }
-        }
+            if (item.Properties.ContainsKey("Restarts"))
+            {
+                if (int.TryParse(item.Properties["Restarts"], out var restarts) && restarts > 0)
+                    status += $" (R:{restarts})";
+            }
 
-        private class HelperStatusEntry
-        {
-            public string Status;
-            public int Restarts;
-            public long Frames;
-            public double Fps;
-            public TimeSpan Uptime;
+            _lblStatusValue.Text = status;
+            _lblUptimeValue.Text = uptime;
         }
     }
 }

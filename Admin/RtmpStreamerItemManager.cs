@@ -6,10 +6,6 @@ using VideoOS.Platform.Admin;
 
 namespace RtmpStreamerPlugin.Admin
 {
-    /// <summary>
-    /// Item manager for the RTMP Streamer nodes in the Management Client admin tree.
-    /// Each item represents a camera-to-RTMP stream configuration.
-    /// </summary>
     public class RtmpStreamerItemManager : ItemManager
     {
         private StreamConfigUserControl _userControl;
@@ -30,8 +26,17 @@ namespace RtmpStreamerPlugin.Admin
         public override UserControl GenerateDetailUserControl()
         {
             _userControl = new StreamConfigUserControl();
-            _userControl.ConfigurationChanged += (s, e) => { };
+            _userControl.ConfigurationChangedByUser += OnConfigurationChangedByUser;
             return _userControl;
+        }
+
+        private void OnConfigurationChangedByUser(object sender, EventArgs e)
+        {
+            if (CurrentItem != null && _userControl != null)
+            {
+                _userControl.UpdateItem(CurrentItem);
+                Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
+            }
         }
 
         public override void ReleaseUserControl()
@@ -55,7 +60,7 @@ namespace RtmpStreamerPlugin.Admin
         {
             if (CurrentItem != null && _userControl != null)
             {
-                _userControl.StoreProperties(CurrentItem);
+                _userControl.UpdateItem(CurrentItem);
                 Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
             }
             return true;
@@ -64,6 +69,19 @@ namespace RtmpStreamerPlugin.Admin
         #endregion
 
         #region Item Management
+
+        public override string GetItemName()
+        {
+            if (_userControl != null)
+                return _userControl.DisplayName;
+            return "";
+        }
+
+        public override void SetItemName(string name)
+        {
+            if (CurrentItem != null)
+                CurrentItem.Name = name;
+        }
 
         public override List<Item> GetItems()
         {
@@ -83,21 +101,11 @@ namespace RtmpStreamerPlugin.Admin
                 RtmpStreamerPluginDefinition.PluginId, _kind, fqid.ObjectId);
         }
 
-        public override string GetItemName()
-        {
-            return CurrentItem?.Name ?? "RTMP Stream";
-        }
-
-        public override void SetItemName(string name)
-        {
-            if (CurrentItem != null)
-                CurrentItem.Name = name;
-        }
-
         public override Item CreateItem(Item parentItem, FQID suggestedFQID)
         {
             CurrentItem = new Item(suggestedFQID, "New RTMP Stream");
-            CurrentItem.Properties["StreamConfig"] = "<RtmpStreams/>";
+            CurrentItem.Properties["Enabled"] = "Yes";
+
             _userControl?.FillContent(CurrentItem);
             Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
             return CurrentItem;

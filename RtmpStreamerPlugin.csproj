@@ -96,13 +96,14 @@
 net stop MilestoneEventServerService 2&gt;nul
 taskkill /f /im VideoOS.Administration.exe 2&gt;nul
 taskkill /f /im RtmpStreamerHelper.exe 2&gt;nul
+ping -n 4 127.0.0.1 &gt;nul
 if not exist "$(MipPluginDir)" mkdir "$(MipPluginDir)"
 exit /b 0
     </PreBuildEvent>
     <PostBuildEvent>
-xcopy /y /d /e /i "$(TargetDir)*" "$(MipPluginDir)" &gt;nul
-copy /y "$(ProjectDir)plugin.def" "$(MipPluginDir)" &gt;nul
-xcopy /y /d /e /i "$(ProjectDir)RtmpStreamerHelper\bin\x64\$(ConfigurationName)\*" "$(MipPluginDir)" &gt;nul
+xcopy /y /d /e /i "$(TargetDir)*" "$(MipPluginDir)" &gt;nul 2&gt;nul
+copy /y "$(ProjectDir)plugin.def" "$(MipPluginDir)" &gt;nul 2&gt;nul
+xcopy /y /d /e /i "$(ProjectDir)RtmpStreamerHelper\bin\x64\$(ConfigurationName)\*" "$(MipPluginDir)" &gt;nul 2&gt;nul
 net start MilestoneEventServerService 2&gt;nul
 start "" "C:\Program Files\Milestone\XProtect Management Client\VideoOS.Administration.exe" 2&gt;nul
 exit /b 0

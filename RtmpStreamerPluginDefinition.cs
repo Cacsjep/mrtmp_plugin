@@ -9,9 +9,9 @@ namespace RtmpStreamerPlugin
 {
     public class RtmpStreamerPluginDefinition : PluginDefinition
     {
-        internal static readonly Guid PluginId = new Guid("F7A1B2C3-D4E5-6789-ABCD-EF0123456789");
-        internal static readonly Guid PluginKindId = new Guid("F7A1B2C3-D4E5-6789-ABCD-EF0123456780");
-        internal static readonly Guid BackgroundPluginId = new Guid("F7A1B2C3-D4E5-6789-ABCD-EF0123456781");
+        internal static readonly Guid PluginId = new Guid("ABA1B2C3-D4E5-6789-ABCD-EF0123456789");
+        internal static readonly Guid PluginKindId = new Guid("ABA1B2C3-D4E5-6789-ABCD-EF0123456780");
+        internal static readonly Guid BackgroundPluginId = new Guid("ABA1B2C3-D4E5-6789-ABCD-EF0123456781");
 
         private static readonly Image _defaultIcon = CreateDefaultIcon();
         private List<BackgroundPlugin> _backgroundPlugins = new List<BackgroundPlugin>();
@@ -57,7 +57,7 @@ namespace RtmpStreamerPlugin
                         new ItemNode(
                             PluginKindId,
                             Guid.Empty,
-                            "RTMP Stream",         // singular item name
+                            "RTMP Stream",          // singular item name
                             _defaultIcon,           // node image
                             "RTMP Streams",         // plural/group name
                             _defaultIcon,           // group image

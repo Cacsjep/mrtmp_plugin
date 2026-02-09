@@ -6,27 +6,20 @@ namespace RtmpStreamerPlugin.Admin
 
         private void InitializeComponent()
         {
-            this._dataGridView = new System.Windows.Forms.DataGridView();
-            this._colCamera = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colRtmpUrl = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colFps = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colUptime = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._btnAdd = new System.Windows.Forms.Button();
-            this._btnRemove = new System.Windows.Forms.Button();
             this._labelTitle = new System.Windows.Forms.Label();
-            this._panelButtons = new System.Windows.Forms.Panel();
-            this._panelAdd = new System.Windows.Forms.GroupBox();
-            this._btnSelectCamera = new System.Windows.Forms.Button();
-            this._txtCameraName = new System.Windows.Forms.TextBox();
+            this._labelName = new System.Windows.Forms.Label();
+            this._txtName = new System.Windows.Forms.TextBox();
             this._labelCamera = new System.Windows.Forms.Label();
-            this._txtRtmpUrl = new System.Windows.Forms.TextBox();
+            this._btnSelectCamera = new System.Windows.Forms.Button();
             this._labelRtmpUrl = new System.Windows.Forms.Label();
-            this._btnAddStream = new System.Windows.Forms.Button();
-            this._labelInfo = new System.Windows.Forms.Label();
-            ((System.ComponentModel.ISupportInitialize)(this._dataGridView)).BeginInit();
-            this._panelButtons.SuspendLayout();
-            this._panelAdd.SuspendLayout();
+            this._txtRtmpUrl = new System.Windows.Forms.TextBox();
+            this._chkEnabled = new System.Windows.Forms.CheckBox();
+            this._grpStatus = new System.Windows.Forms.GroupBox();
+            this._labelStatus = new System.Windows.Forms.Label();
+            this._lblStatusValue = new System.Windows.Forms.Label();
+            this._labelUptime = new System.Windows.Forms.Label();
+            this._lblUptimeValue = new System.Windows.Forms.Label();
+            this._grpStatus.SuspendLayout();
             this.SuspendLayout();
 
             // _labelTitle
@@ -37,181 +30,141 @@ namespace RtmpStreamerPlugin.Admin
             this._labelTitle.Size = new System.Drawing.Size(200, 21);
             this._labelTitle.Text = "RTMP Stream Configuration";
 
-            // _labelInfo
-            this._labelInfo.AutoSize = true;
-            this._labelInfo.Location = new System.Drawing.Point(14, 38);
-            this._labelInfo.Name = "_labelInfo";
-            this._labelInfo.Size = new System.Drawing.Size(400, 13);
-            this._labelInfo.Text = "Configure cameras to stream via RTMP to YouTube, Twitch, or other services.";
+            // _labelName
+            this._labelName.AutoSize = true;
+            this._labelName.Location = new System.Drawing.Point(14, 50);
+            this._labelName.Name = "_labelName";
+            this._labelName.Size = new System.Drawing.Size(38, 13);
+            this._labelName.Text = "Name:";
 
-            // _panelAdd
-            this._panelAdd.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
-            this._panelAdd.Controls.Add(this._btnSelectCamera);
-            this._panelAdd.Controls.Add(this._txtCameraName);
-            this._panelAdd.Controls.Add(this._labelCamera);
-            this._panelAdd.Controls.Add(this._txtRtmpUrl);
-            this._panelAdd.Controls.Add(this._labelRtmpUrl);
-            this._panelAdd.Controls.Add(this._btnAddStream);
-            this._panelAdd.Location = new System.Drawing.Point(14, 60);
-            this._panelAdd.Name = "_panelAdd";
-            this._panelAdd.Size = new System.Drawing.Size(660, 100);
-            this._panelAdd.TabIndex = 0;
-            this._panelAdd.Text = "Add New Stream";
+            // _txtName
+            this._txtName.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
+            this._txtName.Location = new System.Drawing.Point(110, 47);
+            this._txtName.Name = "_txtName";
+            this._txtName.Size = new System.Drawing.Size(400, 20);
+            this._txtName.TabIndex = 0;
+            this._txtName.TextChanged += new System.EventHandler(this.OnUserChange);
 
             // _labelCamera
             this._labelCamera.AutoSize = true;
-            this._labelCamera.Location = new System.Drawing.Point(10, 24);
+            this._labelCamera.Location = new System.Drawing.Point(14, 80);
             this._labelCamera.Name = "_labelCamera";
             this._labelCamera.Size = new System.Drawing.Size(46, 13);
             this._labelCamera.Text = "Camera:";
 
-            // _txtCameraName
-            this._txtCameraName.Location = new System.Drawing.Point(90, 21);
-            this._txtCameraName.Name = "_txtCameraName";
-            this._txtCameraName.ReadOnly = true;
-            this._txtCameraName.Size = new System.Drawing.Size(300, 20);
-            this._txtCameraName.TabIndex = 1;
-            this._txtCameraName.Text = "(Select a camera)";
-
             // _btnSelectCamera
-            this._btnSelectCamera.Location = new System.Drawing.Point(396, 19);
+            this._btnSelectCamera.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
+            this._btnSelectCamera.Location = new System.Drawing.Point(110, 75);
             this._btnSelectCamera.Name = "_btnSelectCamera";
-            this._btnSelectCamera.Size = new System.Drawing.Size(75, 23);
-            this._btnSelectCamera.TabIndex = 2;
-            this._btnSelectCamera.Text = "Select...";
+            this._btnSelectCamera.Size = new System.Drawing.Size(400, 23);
+            this._btnSelectCamera.TabIndex = 1;
+            this._btnSelectCamera.Text = "(Select camera...)";
+            this._btnSelectCamera.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this._btnSelectCamera.UseVisualStyleBackColor = true;
             this._btnSelectCamera.Click += new System.EventHandler(this.BtnSelectCamera_Click);
 
             // _labelRtmpUrl
             this._labelRtmpUrl.AutoSize = true;
-            this._labelRtmpUrl.Location = new System.Drawing.Point(10, 54);
+            this._labelRtmpUrl.Location = new System.Drawing.Point(14, 112);
             this._labelRtmpUrl.Name = "_labelRtmpUrl";
             this._labelRtmpUrl.Size = new System.Drawing.Size(62, 13);
             this._labelRtmpUrl.Text = "RTMP URL:";
 
             // _txtRtmpUrl
-            this._txtRtmpUrl.Location = new System.Drawing.Point(90, 51);
+            this._txtRtmpUrl.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
+            this._txtRtmpUrl.Location = new System.Drawing.Point(110, 109);
             this._txtRtmpUrl.Name = "_txtRtmpUrl";
-            this._txtRtmpUrl.Size = new System.Drawing.Size(381, 20);
-            this._txtRtmpUrl.TabIndex = 3;
+            this._txtRtmpUrl.Size = new System.Drawing.Size(400, 20);
+            this._txtRtmpUrl.TabIndex = 2;
+            this._txtRtmpUrl.TextChanged += new System.EventHandler(this.OnUserChange);
 
-            // _btnAddStream
-            this._btnAddStream.Location = new System.Drawing.Point(485, 35);
-            this._btnAddStream.Name = "_btnAddStream";
-            this._btnAddStream.Size = new System.Drawing.Size(100, 30);
-            this._btnAddStream.TabIndex = 4;
-            this._btnAddStream.Text = "Add Stream";
-            this._btnAddStream.UseVisualStyleBackColor = true;
-            this._btnAddStream.Click += new System.EventHandler(this.BtnAddStream_Click);
+            // _chkEnabled
+            this._chkEnabled.AutoSize = true;
+            this._chkEnabled.Checked = true;
+            this._chkEnabled.CheckState = System.Windows.Forms.CheckState.Checked;
+            this._chkEnabled.Location = new System.Drawing.Point(110, 142);
+            this._chkEnabled.Name = "_chkEnabled";
+            this._chkEnabled.Size = new System.Drawing.Size(65, 17);
+            this._chkEnabled.TabIndex = 3;
+            this._chkEnabled.Text = "Enabled";
+            this._chkEnabled.UseVisualStyleBackColor = true;
+            this._chkEnabled.CheckedChanged += new System.EventHandler(this.OnUserChange);
 
-            // _dataGridView
-            this._dataGridView.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this._dataGridView.AllowUserToAddRows = false;
-            this._dataGridView.AllowUserToDeleteRows = false;
-            this._dataGridView.AllowUserToResizeRows = false;
-            this._dataGridView.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this._dataGridView.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-                this._colCamera,
-                this._colRtmpUrl,
-                this._colStatus,
-                this._colFps,
-                this._colUptime
-            });
-            this._dataGridView.Location = new System.Drawing.Point(14, 170);
-            this._dataGridView.MultiSelect = false;
-            this._dataGridView.Name = "_dataGridView";
-            this._dataGridView.ReadOnly = true;
-            this._dataGridView.RowHeadersVisible = false;
-            this._dataGridView.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this._dataGridView.Size = new System.Drawing.Size(660, 250);
-            this._dataGridView.TabIndex = 5;
+            // _grpStatus
+            this._grpStatus.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
+            this._grpStatus.Controls.Add(this._labelStatus);
+            this._grpStatus.Controls.Add(this._lblStatusValue);
+            this._grpStatus.Controls.Add(this._labelUptime);
+            this._grpStatus.Controls.Add(this._lblUptimeValue);
+            this._grpStatus.Location = new System.Drawing.Point(14, 175);
+            this._grpStatus.Name = "_grpStatus";
+            this._grpStatus.Size = new System.Drawing.Size(496, 70);
+            this._grpStatus.TabIndex = 4;
+            this._grpStatus.TabStop = false;
+            this._grpStatus.Text = "Stream Status";
 
-            // _colCamera
-            this._colCamera.HeaderText = "Camera";
-            this._colCamera.Name = "_colCamera";
-            this._colCamera.ReadOnly = true;
-            this._colCamera.Width = 150;
+            // _labelStatus
+            this._labelStatus.AutoSize = true;
+            this._labelStatus.Location = new System.Drawing.Point(10, 22);
+            this._labelStatus.Name = "_labelStatus";
+            this._labelStatus.Size = new System.Drawing.Size(40, 13);
+            this._labelStatus.Text = "Status:";
 
-            // _colRtmpUrl
-            this._colRtmpUrl.HeaderText = "RTMP URL";
-            this._colRtmpUrl.Name = "_colRtmpUrl";
-            this._colRtmpUrl.ReadOnly = true;
-            this._colRtmpUrl.Width = 220;
+            // _lblStatusValue
+            this._lblStatusValue.AutoSize = true;
+            this._lblStatusValue.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this._lblStatusValue.Location = new System.Drawing.Point(96, 22);
+            this._lblStatusValue.Name = "_lblStatusValue";
+            this._lblStatusValue.Size = new System.Drawing.Size(14, 15);
+            this._lblStatusValue.Text = "-";
 
-            // _colStatus
-            this._colStatus.HeaderText = "Status";
-            this._colStatus.Name = "_colStatus";
-            this._colStatus.ReadOnly = true;
-            this._colStatus.Width = 80;
+            // _labelUptime
+            this._labelUptime.AutoSize = true;
+            this._labelUptime.Location = new System.Drawing.Point(10, 44);
+            this._labelUptime.Name = "_labelUptime";
+            this._labelUptime.Size = new System.Drawing.Size(43, 13);
+            this._labelUptime.Text = "Uptime:";
 
-            // _colFps
-            this._colFps.HeaderText = "FPS";
-            this._colFps.Name = "_colFps";
-            this._colFps.ReadOnly = true;
-            this._colFps.Width = 50;
-
-            // _colUptime
-            this._colUptime.HeaderText = "Uptime";
-            this._colUptime.Name = "_colUptime";
-            this._colUptime.ReadOnly = true;
-            this._colUptime.Width = 80;
-
-            // _panelButtons
-            this._panelButtons.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left));
-            this._panelButtons.Controls.Add(this._btnRemove);
-            this._panelButtons.Location = new System.Drawing.Point(14, 425);
-            this._panelButtons.Name = "_panelButtons";
-            this._panelButtons.Size = new System.Drawing.Size(660, 35);
-
-            // _btnRemove
-            this._btnRemove.Location = new System.Drawing.Point(0, 5);
-            this._btnRemove.Name = "_btnRemove";
-            this._btnRemove.Size = new System.Drawing.Size(120, 25);
-            this._btnRemove.TabIndex = 6;
-            this._btnRemove.Text = "Remove Selected";
-            this._btnRemove.UseVisualStyleBackColor = true;
-            this._btnRemove.Click += new System.EventHandler(this.BtnRemove_Click);
-
-            // _btnAdd (hidden, not used - we use _panelAdd instead)
-            this._btnAdd.Visible = false;
+            // _lblUptimeValue
+            this._lblUptimeValue.AutoSize = true;
+            this._lblUptimeValue.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this._lblUptimeValue.Location = new System.Drawing.Point(96, 44);
+            this._lblUptimeValue.Name = "_lblUptimeValue";
+            this._lblUptimeValue.Size = new System.Drawing.Size(14, 15);
+            this._lblUptimeValue.Text = "-";
 
             // StreamConfigUserControl
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this._labelTitle);
-            this.Controls.Add(this._labelInfo);
-            this.Controls.Add(this._panelAdd);
-            this.Controls.Add(this._dataGridView);
-            this.Controls.Add(this._panelButtons);
+            this.Controls.Add(this._labelName);
+            this.Controls.Add(this._txtName);
+            this.Controls.Add(this._labelCamera);
+            this.Controls.Add(this._btnSelectCamera);
+            this.Controls.Add(this._labelRtmpUrl);
+            this.Controls.Add(this._txtRtmpUrl);
+            this.Controls.Add(this._chkEnabled);
+            this.Controls.Add(this._grpStatus);
             this.Name = "StreamConfigUserControl";
-            this.Size = new System.Drawing.Size(690, 470);
-            ((System.ComponentModel.ISupportInitialize)(this._dataGridView)).EndInit();
-            this._panelButtons.ResumeLayout(false);
-            this._panelAdd.ResumeLayout(false);
-            this._panelAdd.PerformLayout();
+            this.Size = new System.Drawing.Size(530, 260);
+            this._grpStatus.ResumeLayout(false);
+            this._grpStatus.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
 
-        private System.Windows.Forms.DataGridView _dataGridView;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colCamera;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colRtmpUrl;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colStatus;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colFps;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colUptime;
-        private System.Windows.Forms.Button _btnAdd;
-        private System.Windows.Forms.Button _btnRemove;
         private System.Windows.Forms.Label _labelTitle;
-        private System.Windows.Forms.Panel _panelButtons;
-        private System.Windows.Forms.GroupBox _panelAdd;
-        private System.Windows.Forms.Button _btnSelectCamera;
-        private System.Windows.Forms.TextBox _txtCameraName;
+        private System.Windows.Forms.Label _labelName;
+        private System.Windows.Forms.TextBox _txtName;
         private System.Windows.Forms.Label _labelCamera;
-        private System.Windows.Forms.TextBox _txtRtmpUrl;
+        private System.Windows.Forms.Button _btnSelectCamera;
         private System.Windows.Forms.Label _labelRtmpUrl;
-        private System.Windows.Forms.Button _btnAddStream;
-        private System.Windows.Forms.Label _labelInfo;
+        private System.Windows.Forms.TextBox _txtRtmpUrl;
+        private System.Windows.Forms.CheckBox _chkEnabled;
+        private System.Windows.Forms.GroupBox _grpStatus;
+        private System.Windows.Forms.Label _labelStatus;
+        private System.Windows.Forms.Label _lblStatusValue;
+        private System.Windows.Forms.Label _labelUptime;
+        private System.Windows.Forms.Label _lblUptimeValue;
     }
 }

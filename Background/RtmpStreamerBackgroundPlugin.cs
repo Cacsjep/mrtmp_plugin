@@ -4,29 +4,22 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading;
-using System.Xml.Linq;
-using RtmpStreamerPlugin.Streaming;
 using VideoOS.Platform;
 using VideoOS.Platform.Background;
 using VideoOS.Platform.Messaging;
 
 namespace RtmpStreamerPlugin.Background
 {
-    /// <summary>
-    /// Background plugin that runs on the Event Server as a Windows service.
-    /// Launches standalone helper processes to stream cameras to RTMP destinations.
-    /// Each helper runs in MIP SDK standalone mode where RawLiveSource is supported.
-    /// </summary>
     public class RtmpStreamerBackgroundPlugin : BackgroundPlugin
     {
         private object _configMessageObj;
-        private readonly ConcurrentDictionary<string, HelperProcess> _helpers = new ConcurrentDictionary<string, HelperProcess>();
+        private readonly ConcurrentDictionary<Guid, HelperProcess> _helpers = new ConcurrentDictionary<Guid, HelperProcess>();
         private Timer _monitorTimer;
         private volatile bool _closing;
         private string _helperExePath;
         private string _serverUri;
         private string _milestoneDir;
-        private string _lastStreamConfig; // Track actual config to detect real changes vs status writes
+        private string _lastConfigSnapshot;
 
         public override Guid Id => RtmpStreamerPluginDefinition.BackgroundPluginId;
         public override string Name => "RTMP Streamer Background";
@@ -40,7 +33,6 @@ namespace RtmpStreamerPlugin.Background
         {
             PluginLog.Info("Background plugin initializing");
 
-            // Find helper exe (same directory as this DLL)
             var pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             _helperExePath = Path.Combine(pluginDir, "RtmpStreamerHelper.exe");
 
@@ -52,11 +44,9 @@ namespace RtmpStreamerPlugin.Background
 
             PluginLog.Info($"Helper exe: {_helperExePath}");
 
-            // Determine Milestone install directory (for helper assembly resolution)
             _milestoneDir = Path.GetDirectoryName(typeof(EnvironmentManager).Assembly.Location);
             PluginLog.Info($"Milestone dir: {_milestoneDir}");
 
-            // Build management server URI from MasterSite
             try
             {
                 var serverId = EnvironmentManager.Instance.MasterSite.ServerId;
@@ -69,17 +59,14 @@ namespace RtmpStreamerPlugin.Background
                 return;
             }
 
-            // Register for config changes, filtered to our plugin's Kind
             _configMessageObj = EnvironmentManager.Instance.RegisterReceiver(
                 OnConfigurationChanged,
                 new MessageIdAndRelatedKindFilter(
                     MessageId.Server.ConfigurationChangedIndication,
                     RtmpStreamerPluginDefinition.PluginKindId));
 
-            // Load and start configured streams
             LoadAndStartStreams();
 
-            // Monitor helper processes every 10 seconds
             _monitorTimer = new Timer(MonitorHelpers, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
         }
 
@@ -98,42 +85,39 @@ namespace RtmpStreamerPlugin.Background
             }
 
             StopAllHelpers();
-            WriteHelperStatus(); // Write final "Stopped" status
+            WriteAllHelperStatus();
         }
 
         private void LoadAndStartStreams()
         {
             try
             {
-                var configItems = Configuration.Instance.GetItemConfigurations(
+                var items = Configuration.Instance.GetItemConfigurations(
                     RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
 
-                foreach (var item in configItems)
+                foreach (var item in items)
                 {
-                    string configXml = null;
-                    if (item.Properties.ContainsKey("StreamConfig"))
-                        configXml = item.Properties["StreamConfig"];
+                    // Each item is one stream with its own properties
+                    var enabled = !item.Properties.ContainsKey("Enabled") || item.Properties["Enabled"] != "No";
+                    if (!enabled) continue;
 
-                    if (!string.IsNullOrEmpty(configXml))
-                    {
-                        var configs = StreamSessionManager.LoadConfigXml(configXml);
-                        foreach (var config in configs)
-                        {
-                            if (!config.AutoStart || config.CameraId == Guid.Empty || string.IsNullOrEmpty(config.RtmpUrl))
-                                continue;
+                    if (!item.Properties.ContainsKey("CameraId") || !item.Properties.ContainsKey("RtmpUrl"))
+                        continue;
 
-                            LaunchHelper(config.CameraId, config.CameraName, config.RtmpUrl);
-                        }
-                    }
+                    if (!Guid.TryParse(item.Properties["CameraId"], out var cameraId) || cameraId == Guid.Empty)
+                        continue;
+
+                    var rtmpUrl = item.Properties["RtmpUrl"];
+                    if (string.IsNullOrEmpty(rtmpUrl)) continue;
+
+                    var cameraName = item.Properties.ContainsKey("CameraName") ? item.Properties["CameraName"] : "";
+
+                    LaunchHelper(item.FQID.ObjectId, cameraId, cameraName, rtmpUrl);
                 }
 
-                // Snapshot the current stream config for change detection
-                _lastStreamConfig = GetStreamConfigSnapshot();
-
+                _lastConfigSnapshot = GetConfigSnapshot();
                 PluginLog.Info($"Loaded streams. Active helpers: {_helpers.Count}");
-
-                // Write initial status
-                WriteHelperStatus();
+                WriteAllHelperStatus();
             }
             catch (Exception ex)
             {
@@ -141,12 +125,9 @@ namespace RtmpStreamerPlugin.Background
             }
         }
 
-        private void LaunchHelper(Guid cameraId, string cameraName, string rtmpUrl)
+        private void LaunchHelper(Guid itemId, Guid cameraId, string cameraName, string rtmpUrl)
         {
-            var key = $"{cameraId}|{rtmpUrl}";
-
-            // Kill existing helper for this key if any
-            if (_helpers.TryRemove(key, out var existing))
+            if (_helpers.TryRemove(itemId, out var existing))
                 KillHelper(existing);
 
             try
@@ -172,6 +153,7 @@ namespace RtmpStreamerPlugin.Background
                 var helper = new HelperProcess
                 {
                     Process = process,
+                    ItemId = itemId,
                     CameraId = cameraId,
                     CameraName = cameraName,
                     RtmpUrl = rtmpUrl,
@@ -179,23 +161,19 @@ namespace RtmpStreamerPlugin.Background
                     RestartCount = 0
                 };
 
-                // Read stderr async for logging and stats parsing
                 process.ErrorDataReceived += (s, e) =>
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
-
-                    // Parse STATS lines: "STATS frames=1234 fps=25.0 bytes=5678900 keyframes=50"
                     if (e.Data.StartsWith("STATS "))
                     {
                         ParseStats(helper, e.Data);
                         return;
                     }
-
                     PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
                 };
                 process.BeginErrorReadLine();
 
-                _helpers[key] = helper;
+                _helpers[itemId] = helper;
                 PluginLog.Info($"Helper launched: PID={process.Id}, camera={cameraName}");
             }
             catch (Exception ex)
@@ -208,7 +186,6 @@ namespace RtmpStreamerPlugin.Background
         {
             foreach (var kvp in _helpers)
                 KillHelper(kvp.Value);
-
             _helpers.Clear();
         }
 
@@ -237,9 +214,10 @@ namespace RtmpStreamerPlugin.Background
         {
             if (_closing) return;
 
+            bool anyRestarted = false;
             foreach (var kvp in _helpers)
             {
-                var key = kvp.Key;
+                var itemId = kvp.Key;
                 var helper = kvp.Value;
 
                 try
@@ -251,14 +229,13 @@ namespace RtmpStreamerPlugin.Background
 
                         try { helper.Process?.Dispose(); } catch { }
 
-                        // Relaunch
                         var restartCount = helper.RestartCount + 1;
-                        LaunchHelper(helper.CameraId, helper.CameraName, helper.RtmpUrl);
+                        LaunchHelper(itemId, helper.CameraId, helper.CameraName, helper.RtmpUrl);
 
-                        // Preserve restart count
-                        if (_helpers.TryGetValue(key, out var newHelper))
+                        if (_helpers.TryGetValue(itemId, out var newHelper))
                             newHelper.RestartCount = restartCount;
 
+                        anyRestarted = true;
                     }
                 }
                 catch (Exception ex)
@@ -267,42 +244,35 @@ namespace RtmpStreamerPlugin.Background
                 }
             }
 
-            // Update status periodically so admin can see uptime
-            WriteHelperStatus();
+            if (anyRestarted)
+                WriteAllHelperStatus();
         }
 
-        /// <summary>
-        /// Write current helper status to config items so the Admin plugin can display it.
-        /// </summary>
-        private void WriteHelperStatus()
+        private void WriteAllHelperStatus()
         {
             try
             {
-                var configItems = Configuration.Instance.GetItemConfigurations(
+                var items = Configuration.Instance.GetItemConfigurations(
                     RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
 
-                foreach (var item in configItems)
+                foreach (var item in items)
                 {
-                    var statusRoot = new XElement("HelperStatus");
-                    foreach (var helper in _helpers.Values)
+                    if (_helpers.TryGetValue(item.FQID.ObjectId, out var helper))
                     {
                         bool alive = false;
                         try { alive = helper.Process != null && !helper.Process.HasExited; } catch { }
 
-                        statusRoot.Add(new XElement("Helper",
-                            new XAttribute("CameraId", helper.CameraId),
-                            new XAttribute("Status", alive ? "Streaming" : "Stopped"),
-                            new XAttribute("PID", helper.Process?.Id ?? 0),
-                            new XAttribute("StartTime", helper.StartTime.ToString("o")),
-                            new XAttribute("Restarts", helper.RestartCount),
-                            new XAttribute("Frames", helper.Frames),
-                            new XAttribute("Fps", helper.Fps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)),
-                            new XAttribute("Bytes", helper.Bytes),
-                            new XAttribute("KeyFrames", helper.KeyFrames)
-                        ));
+                        item.Properties["Status"] = alive ? "Streaming" : "Stopped";
+                        item.Properties["StartTime"] = helper.StartTime.ToString("o");
+                        item.Properties["Restarts"] = helper.RestartCount.ToString();
+                    }
+                    else
+                    {
+                        item.Properties["Status"] = "Stopped";
+                        item.Properties["StartTime"] = "";
+                        item.Properties["Restarts"] = "0";
                     }
 
-                    item.Properties["StreamStatus"] = statusRoot.ToString();
                     Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, item);
                 }
             }
@@ -312,39 +282,35 @@ namespace RtmpStreamerPlugin.Background
             }
         }
 
-        /// <summary>
-        /// Snapshot the current StreamConfig values to detect real config changes.
-        /// </summary>
-        private string GetStreamConfigSnapshot()
+        private string GetConfigSnapshot()
         {
             try
             {
                 var sb = new System.Text.StringBuilder();
-                var configItems = Configuration.Instance.GetItemConfigurations(
+                var items = Configuration.Instance.GetItemConfigurations(
                     RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
 
-                foreach (var item in configItems)
+                foreach (var item in items)
                 {
-                    if (item.Properties.ContainsKey("StreamConfig"))
-                        sb.Append(item.Properties["StreamConfig"]);
+                    sb.Append(item.FQID.ObjectId);
+                    if (item.Properties.ContainsKey("CameraId")) sb.Append(item.Properties["CameraId"]);
+                    if (item.Properties.ContainsKey("RtmpUrl")) sb.Append(item.Properties["RtmpUrl"]);
+                    if (item.Properties.ContainsKey("Enabled")) sb.Append(item.Properties["Enabled"]);
+                    sb.Append("|");
                 }
                 return sb.ToString();
             }
-            catch
-            {
-                return "";
-            }
+            catch { return ""; }
         }
 
         private object OnConfigurationChanged(Message message, FQID dest, FQID sender)
         {
-            // Check if the actual stream configuration changed (not just a status update)
-            var currentConfig = GetStreamConfigSnapshot();
-            if (currentConfig == _lastStreamConfig)
-                return null; // Status write or no real change, ignore
+            var currentConfig = GetConfigSnapshot();
+            if (currentConfig == _lastConfigSnapshot)
+                return null;
 
             PluginLog.Info("Stream configuration changed, reloading helpers");
-            _lastStreamConfig = currentConfig;
+            _lastConfigSnapshot = currentConfig;
 
             try
             {
@@ -361,7 +327,6 @@ namespace RtmpStreamerPlugin.Background
 
         private static void ParseStats(HelperProcess helper, string line)
         {
-            // "STATS frames=1234 fps=25.0 bytes=5678900 keyframes=50"
             foreach (var part in line.Split(' '))
             {
                 var kv = part.Split('=');
@@ -389,6 +354,7 @@ namespace RtmpStreamerPlugin.Background
         private class HelperProcess
         {
             public Process Process;
+            public Guid ItemId;
             public Guid CameraId;
             public string CameraName;
             public string RtmpUrl;
