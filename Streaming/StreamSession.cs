@@ -106,10 +106,11 @@ namespace RtmpStreamerPlugin.Streaming
 
         private void RunLoop()
         {
-            while (_running && !_cts.IsCancellationRequested)
+            while (_running)
             {
                 try
                 {
+                    EmitStatus($"Connecting to {_rtmpUrl}");
                     Log($"Connecting to RTMP server: {_rtmpUrl}");
 
                     // Initialize components
@@ -119,36 +120,45 @@ namespace RtmpStreamerPlugin.Streaming
 
                     // Connect to RTMP server
                     _publisher.Connect(_rtmpUrl, _allowUntrustedCerts);
-                    Log("RTMP connected, starting camera frame source");
+                    Log("RTMP publish started, initializing camera");
 
                     // Start camera frame source
+                    EmitStatus("Initializing camera");
                     _frameSource.FrameReceived += OnFrameReceived;
                     _frameSource.Error += OnFrameError;
                     _frameSource.Init(_cameraItem);
                     _frameSource.Start();
 
-                    Log("Streaming started");
+                    Log($"Camera initialized: {_cameraItem.Name}");
+                    EmitStatus("Waiting for first frame");
 
-                    // Wait until cancelled or error
+                    // Wait until cancelled (by Stop or frame send error)
                     _cts.Token.WaitHandle.WaitOne();
                 }
                 catch (Exception ex)
                 {
                     _lastError = ex.Message;
+                    var errorMsg = ClassifyError(ex);
+                    EmitStatus($"Error: {errorMsg}");
                     Log($"Error: {ex.Message}");
                 }
 
                 Cleanup();
 
-                // If still running, wait before reconnecting
-                if (_running && !_cts.IsCancellationRequested)
-                {
-                    Log("Reconnecting in 5 seconds...");
-                    _cts.Token.WaitHandle.WaitOne(5000);
-                    _streamEpochSet = false;
-                    _audioHeaderSent = false;
-                }
+                if (!_running) break;
+
+                // Reset CTS for reconnect wait and next iteration
+                EmitStatus("Reconnecting in 5s");
+                Log("Reconnecting in 5 seconds...");
+                try { _cts?.Dispose(); } catch { }
+                _cts = new CancellationTokenSource();
+                _cts.Token.WaitHandle.WaitOne(5000);
+
+                _streamEpochSet = false;
+                _audioHeaderSent = false;
             }
+
+            EmitStatus("Stopped");
         }
 
         private void OnFrameReceived(byte[] annexBData, bool isKeyFrame, DateTime timestamp)
@@ -208,13 +218,22 @@ namespace RtmpStreamerPlugin.Streaming
                     _bytesSent += flvPayload.Length;
                     if (isKeyFrame) _keyFramesSent++;
 
+                    // Emit "Streaming" status on first frame
+                    if (_framesSent == 1)
+                    {
+                        EmitStatus("Streaming");
+                        Log("First frame sent successfully, stream is live");
+                    }
+
                     if (_framesSent <= 3 || _framesSent % 500 == 0)
-                        Log($"Frame #{_framesSent} sent: {flvPayload.Length} bytes, ts={rtmpTimestamp}ms, keyframe={isKeyFrame}");
+                        Log($"Frame #{_framesSent}: {flvPayload.Length} bytes, ts={rtmpTimestamp}ms, keyframe={isKeyFrame}");
                 }
             }
             catch (Exception ex)
             {
                 _lastError = ex.Message;
+                var errorMsg = ClassifyError(ex);
+                EmitStatus($"Error: {errorMsg}");
                 Log($"Send error: {ex.Message}");
                 // Trigger reconnect by cancelling
                 try { _cts?.Cancel(); } catch { }
@@ -225,6 +244,12 @@ namespace RtmpStreamerPlugin.Streaming
         {
             _lastError = message;
             Log($"Frame source error: {message}");
+
+            // Emit codec errors as status so they show in Management Client
+            if (message.Contains("codec"))
+                EmitStatus($"Codec error: {message}");
+            else
+                EmitStatus($"Error: {message}");
         }
 
         private void Cleanup()
@@ -248,6 +273,55 @@ namespace RtmpStreamerPlugin.Streaming
         private void Log(string message)
         {
             PluginLog.Info($"[Session:{_sessionId}] {message}");
+        }
+
+        /// <summary>
+        /// Emit a STATUS protocol line on stderr for BackgroundPlugin to parse.
+        /// This drives the item status display in Management Client.
+        /// </summary>
+        private void EmitStatus(string status)
+        {
+            try { Console.Error.WriteLine($"STATUS {status}"); } catch { }
+        }
+
+        /// <summary>
+        /// Classify an exception into a user-friendly status message.
+        /// </summary>
+        private static string ClassifyError(Exception ex)
+        {
+            var msg = ex.Message;
+
+            if (ex is System.Net.Sockets.SocketException sockEx)
+            {
+                switch (sockEx.SocketErrorCode)
+                {
+                    case System.Net.Sockets.SocketError.ConnectionRefused:
+                        return "Connection refused by RTMP server";
+                    case System.Net.Sockets.SocketError.HostNotFound:
+                        return "RTMP server hostname not found";
+                    case System.Net.Sockets.SocketError.TimedOut:
+                        return "Connection to RTMP server timed out";
+                    case System.Net.Sockets.SocketError.NetworkUnreachable:
+                        return "Network unreachable";
+                    default:
+                        return $"Network error: {sockEx.SocketErrorCode}";
+                }
+            }
+
+            if (ex is System.IO.IOException)
+            {
+                if (msg.Contains("closed") || msg.Contains("reset"))
+                    return "Connection closed by RTMP server";
+                return $"Connection error: {msg}";
+            }
+
+            if (ex is System.Security.Authentication.AuthenticationException)
+                return $"TLS/SSL error: {msg}";
+
+            if (msg.Contains("RTMP error") || msg.Contains("RTMP publish"))
+                return msg;
+
+            return msg;
         }
     }
 }

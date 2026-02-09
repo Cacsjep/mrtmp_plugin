@@ -160,7 +160,6 @@ namespace RtmpStreamerPlugin.Background
                     CameraName = cameraName,
                     RtmpUrl = rtmpUrl,
                     AllowUntrustedCerts = allowUntrustedCerts,
-                    StartTime = DateTime.UtcNow,
                     RestartCount = 0
                 };
 
@@ -170,6 +169,11 @@ namespace RtmpStreamerPlugin.Background
                     if (e.Data.StartsWith("STATS "))
                     {
                         ParseStats(helper, e.Data);
+                        return;
+                    }
+                    if (e.Data.StartsWith("STATUS "))
+                    {
+                        helper.LastStatus = e.Data.Substring(7);
                         return;
                     }
                     PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
@@ -217,7 +221,6 @@ namespace RtmpStreamerPlugin.Background
         {
             if (_closing) return;
 
-            bool anyRestarted = false;
             foreach (var kvp in _helpers)
             {
                 var itemId = kvp.Key;
@@ -237,8 +240,6 @@ namespace RtmpStreamerPlugin.Background
 
                         if (_helpers.TryGetValue(itemId, out var newHelper))
                             newHelper.RestartCount = restartCount;
-
-                        anyRestarted = true;
                     }
                 }
                 catch (Exception ex)
@@ -247,8 +248,8 @@ namespace RtmpStreamerPlugin.Background
                 }
             }
 
-            if (anyRestarted)
-                WriteAllHelperStatus();
+            // Always write status so STATUS line changes propagate to item properties
+            WriteAllHelperStatus();
         }
 
         private void WriteAllHelperStatus()
@@ -260,19 +261,39 @@ namespace RtmpStreamerPlugin.Background
 
                 foreach (var item in items)
                 {
+                    string status;
+                    string restarts = "0";
+
                     if (_helpers.TryGetValue(item.FQID.ObjectId, out var helper))
                     {
                         bool alive = false;
                         try { alive = helper.Process != null && !helper.Process.HasExited; } catch { }
 
-                        item.Properties["Status"] = alive ? "Streaming" : "Stopped";
-                        item.Properties["StartTime"] = helper.StartTime.ToString("o");
-                        item.Properties["Restarts"] = helper.RestartCount.ToString();
+                        if (!string.IsNullOrEmpty(helper.LastStatus))
+                            status = helper.LastStatus;
+                        else
+                            status = alive ? "Starting" : "Stopped";
+
+                        restarts = helper.RestartCount.ToString();
+
+                        // Only save when something actually changed
+                        if (status == helper.LastWrittenStatus && restarts == helper.LastWrittenRestarts)
+                            continue;
+
+                        item.Properties["Status"] = status;
+                        item.Properties["Restarts"] = restarts;
+
+                        helper.LastWrittenStatus = status;
+                        helper.LastWrittenRestarts = restarts;
                     }
                     else
                     {
+                        // No helper running - only write "Stopped" once
+                        var existing = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "";
+                        if (existing == "Stopped")
+                            continue;
+
                         item.Properties["Status"] = "Stopped";
-                        item.Properties["StartTime"] = "";
                         item.Properties["Restarts"] = "0";
                     }
 
@@ -363,8 +384,10 @@ namespace RtmpStreamerPlugin.Background
             public string CameraName;
             public string RtmpUrl;
             public bool AllowUntrustedCerts;
-            public DateTime StartTime;
             public int RestartCount;
+            public volatile string LastStatus;
+            public string LastWrittenStatus;
+            public string LastWrittenRestarts;
             public long Frames;
             public double Fps;
             public long Bytes;

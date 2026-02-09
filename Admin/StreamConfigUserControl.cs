@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -13,25 +12,18 @@ namespace RtmpStreamerPlugin.Admin
     {
         private Item _currentItem;
         private Item _selectedCameraItem;
-        private Timer _refreshTimer;
 
         internal event EventHandler ConfigurationChangedByUser;
 
         public StreamConfigUserControl()
         {
             InitializeComponent();
-
-            _refreshTimer = new Timer { Interval = 1000 };
-            _refreshTimer.Tick += (s, e) => RefreshStatus();
-            _refreshTimer.Start();
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                _refreshTimer?.Stop();
-                _refreshTimer?.Dispose();
                 components?.Dispose();
             }
             base.Dispose(disposing);
@@ -90,9 +82,6 @@ namespace RtmpStreamerPlugin.Admin
             // Load allow untrusted certs
             _chkAllowUntrustedCerts.Checked = item.Properties.ContainsKey("AllowUntrustedCerts")
                 && item.Properties["AllowUntrustedCerts"] == "Yes";
-
-            // Load status
-            RefreshStatusFromItem(item);
         }
 
         public string ValidateInput()
@@ -140,8 +129,6 @@ namespace RtmpStreamerPlugin.Admin
             _txtRtmpUrl.Text = "";
             _chkEnabled.Checked = true;
             _chkAllowUntrustedCerts.Checked = false;
-            _lblStatusValue.Text = "-";
-            _lblUptimeValue.Text = "-";
         }
 
         private void BtnSelectCamera_Click(object sender, EventArgs e)
@@ -165,52 +152,6 @@ namespace RtmpStreamerPlugin.Admin
         {
             if (ConfigurationChangedByUser != null)
                 ConfigurationChangedByUser(this, new EventArgs());
-        }
-
-        private void RefreshStatus()
-        {
-            if (_currentItem == null) return;
-
-            try
-            {
-                var freshItem = Configuration.Instance.GetItemConfiguration(
-                    RtmpStreamerPluginDefinition.PluginId,
-                    RtmpStreamerPluginDefinition.PluginKindId,
-                    _currentItem.FQID.ObjectId);
-
-                if (freshItem != null)
-                    RefreshStatusFromItem(freshItem);
-            }
-            catch { }
-        }
-
-        private void RefreshStatusFromItem(Item item)
-        {
-            var status = "-";
-            var uptime = "-";
-
-            if (item.Properties.ContainsKey("Status"))
-                status = item.Properties["Status"];
-
-            if (item.Properties.ContainsKey("StartTime"))
-            {
-                if (DateTime.TryParse(item.Properties["StartTime"], CultureInfo.InvariantCulture,
-                    DateTimeStyles.RoundtripKind, out var startTime))
-                {
-                    var elapsed = DateTime.UtcNow - startTime;
-                    if (elapsed.TotalSeconds > 0)
-                        uptime = elapsed.ToString(@"hh\:mm\:ss");
-                }
-            }
-
-            if (item.Properties.ContainsKey("Restarts"))
-            {
-                if (int.TryParse(item.Properties["Restarts"], out var restarts) && restarts > 0)
-                    status += $" (R:{restarts})";
-            }
-
-            _lblStatusValue.Text = status;
-            _lblUptimeValue.Text = uptime;
         }
     }
 }

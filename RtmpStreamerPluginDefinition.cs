@@ -102,11 +102,12 @@ namespace RtmpStreamerPlugin
             var bmp = new Bitmap(16, 16);
             using (var g = Graphics.FromImage(bmp))
             {
-                g.Clear(Color.FromArgb(200, 40, 40));
-                g.FillPolygon(Brushes.White, new[]
-                {
-                    new PointF(5, 3), new PointF(5, 13), new PointF(13, 8)
-                });
+                g.Clear(Color.White);
+                using (var brush = new SolidBrush(Color.FromArgb(40, 100, 200)))
+                    g.FillPolygon(brush, new[]
+                    {
+                        new PointF(5, 3), new PointF(5, 13), new PointF(13, 8)
+                    });
             }
             return bmp;
         }

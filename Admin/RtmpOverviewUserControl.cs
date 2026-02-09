@@ -26,7 +26,11 @@ namespace RtmpStreamerPlugin.Admin
                     "  4. Click Save to start streaming.\n\n" +
                     "Each stream runs as an independent process. If a stream crashes,\n" +
                     "it will automatically restart within seconds.\n\n" +
-                    "Use the Enabled checkbox to start or stop individual streams."
+                    "Supported protocols: RTMP and RTMPS (TLS).\n" +
+                    "A silent audio track is included automatically for YouTube/Twitch compatibility.\n" +
+                    "Only H.264 cameras are supported.\n\n" +
+                    "Status indicators:\n" +
+                    "  Green = Streaming     Yellow = Not yet started     Red = Error     Grey = Disabled"
             };
             Controls.Add(label);
         }

@@ -77,6 +77,44 @@ namespace RtmpStreamerPlugin.Admin
 
         #endregion
 
+        #region Status
+
+        public override OperationalState GetOperationalState(Item item)
+        {
+            if (item == null)
+                return OperationalState.Disabled;
+
+            var enabled = !item.Properties.ContainsKey("Enabled") || item.Properties["Enabled"] != "No";
+            if (!enabled)
+                return OperationalState.Disabled;
+
+            var status = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "";
+
+            if (status.StartsWith("Streaming"))
+                return OperationalState.OkActive;
+
+            if (status.StartsWith("Error") || status.StartsWith("Codec"))
+                return OperationalState.Error;
+
+            // Stopped or no status yet
+            return OperationalState.Ok;
+        }
+
+        public override string GetItemStatusDetails(Item item, string language)
+        {
+            if (item == null)
+                return "";
+
+            var enabled = !item.Properties.ContainsKey("Enabled") || item.Properties["Enabled"] != "No";
+            if (!enabled)
+                return "Disabled";
+
+            var status = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "Not started";
+            return status;
+        }
+
+        #endregion
+
         #region Item Management
 
         public override string GetItemName()

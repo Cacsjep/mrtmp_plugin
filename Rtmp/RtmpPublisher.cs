@@ -64,6 +64,8 @@ namespace RtmpStreamerPlugin.Rtmp
         {
             ParseUrl(rtmpUrl);
 
+            PluginLog.Info($"[RTMP] Connecting to {_host}:{_port} (TLS={_useTls})");
+
             _tcpClient = new TcpClient();
             _tcpClient.NoDelay = true;
             _tcpClient.SendTimeout = 10000;
@@ -71,16 +73,20 @@ namespace RtmpStreamerPlugin.Rtmp
             _tcpClient.SendBufferSize = 256 * 1024;
             _tcpClient.Connect(_host, _port);
 
+            PluginLog.Info($"[RTMP] TCP connected to {_host}:{_port}");
+
             _netStream = _tcpClient.GetStream();
 
             if (_useTls)
             {
+                PluginLog.Info("[RTMP] Starting TLS handshake");
                 _sslStream = new SslStream(_netStream, false, (sender, cert, chain, errors) =>
                 {
                     if (allowUntrustedCerts) return true;
                     return errors == SslPolicyErrors.None;
                 });
                 _sslStream.AuthenticateAsClient(_host);
+                PluginLog.Info($"[RTMP] TLS handshake complete (protocol={_sslStream.SslProtocol})");
                 _readStream = _sslStream;
                 _bufferedStream = new BufferedStream(_sslStream, 64 * 1024);
             }
@@ -92,19 +98,25 @@ namespace RtmpStreamerPlugin.Rtmp
 
             _chunkWriter = new RtmpChunkWriter(_bufferedStream);
 
+            PluginLog.Info("[RTMP] Performing RTMP handshake");
             PerformHandshake();
             _connected = true;
+            PluginLog.Info("[RTMP] RTMP handshake complete");
 
+            PluginLog.Info($"[RTMP] Sending connect command (app={_app})");
             SendConnect();
             ReadResponses(); // Read until we get connect result
+            PluginLog.Info("[RTMP] Connect accepted by server");
 
             SendReleaseStream();
             SendFCPublish();
             SendCreateStream();
             ReadResponses(); // Read until we get createStream result
+            PluginLog.Info($"[RTMP] Stream created (streamId={_streamId})");
 
             SendPublish();
             ReadResponses(); // Read until we get onStatus publish start
+            PluginLog.Info("[RTMP] Publish started successfully");
 
             // Set our output chunk size
             SendSetChunkSize(OutputChunkSize);
@@ -171,12 +183,16 @@ namespace RtmpStreamerPlugin.Rtmp
         /// </summary>
         public void Disconnect()
         {
+            var wasPublishing = _publishing;
             _publishing = false;
             _connected = false;
             _firstVideoMessage = true;
             _lastVideoTimestamp = 0;
             _firstAudioMessage = true;
             _lastAudioTimestamp = 0;
+
+            if (wasPublishing)
+                PluginLog.Info("[RTMP] Disconnecting from server");
 
             try
             {

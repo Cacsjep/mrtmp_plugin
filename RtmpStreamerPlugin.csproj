@@ -56,7 +56,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PluginLog.cs" />
     <Compile Include="RtmpStreamerPluginDefinition.cs" />
-    <Compile Include="Admin\RtmpOverviewUserControl.cs" />
+    <Compile Include="Admin\RtmpOverviewUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Admin\RtmpStreamerItemManager.cs" />
     <Compile Include="Admin\StreamConfigUserControl.cs">
       <SubType>UserControl</SubType>
