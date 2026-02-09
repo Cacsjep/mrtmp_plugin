@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Windows.Forms;
 using VideoOS.Platform;
 using VideoOS.Platform.Admin;
 using VideoOS.Platform.Background;
+using VideoOS.Platform.UI;
 
 namespace RtmpStreamerPlugin
 {
@@ -17,6 +19,8 @@ namespace RtmpStreamerPlugin
         private List<BackgroundPlugin> _backgroundPlugins = new List<BackgroundPlugin>();
         private List<ItemNode> _itemNodes;
         private Image _icon;
+
+        internal static Image DefaultIcon => _defaultIcon;
 
         public override Guid Id => PluginId;
         public override string Name => "RTMP Streamer";
@@ -71,6 +75,24 @@ namespace RtmpStreamerPlugin
                 }
                 return _itemNodes;
             }
+        }
+
+        public override UserControl GenerateUserControl()
+        {
+            return new HelpUserControl(
+                _defaultIcon,
+                "RTMP Streamer Plugin",
+                "This plugin streams live camera video from Milestone XProtect to RTMP servers.\n\n" +
+                "Supported platforms:\n" +
+                "  - YouTube Live\n" +
+                "  - Twitch\n" +
+                "  - Facebook Live\n" +
+                "  - Any custom RTMP/RTMPS endpoint\n\n" +
+                "How it works:\n" +
+                "The plugin runs on the Event Server and launches a helper process for each configured stream. " +
+                "Each helper connects to the Recording Server, receives the live H.264 video stream, " +
+                "packages it in FLV format, and publishes it to the configured RTMP URL.\n\n" +
+                "To configure streams, expand the 'RTMP Streams' node in the tree on the left.");
         }
 
         public override List<BackgroundPlugin> BackgroundPlugins => _backgroundPlugins;

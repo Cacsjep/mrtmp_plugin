@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using System.Xml.Linq;
 using VideoOS.Platform;
 using VideoOS.Platform.UI;
 
@@ -91,6 +91,24 @@ namespace RtmpStreamerPlugin.Admin
             RefreshStatusFromItem(item);
         }
 
+        public string ValidateInput()
+        {
+            if (string.IsNullOrWhiteSpace(_txtName.Text))
+                return "Please enter a name for the stream.";
+
+            if (_selectedCameraItem == null)
+                return "Please select a camera.";
+
+            var rtmpUrl = _txtRtmpUrl.Text.Trim();
+            if (string.IsNullOrEmpty(rtmpUrl) || rtmpUrl == "rtmp://")
+                return "Please enter an RTMP URL.";
+
+            if (!Regex.IsMatch(rtmpUrl, @"^rtmps?://[^\s]+$", RegexOptions.IgnoreCase))
+                return "RTMP URL must start with rtmp:// or rtmps:// and contain no spaces.";
+
+            return null;
+        }
+
         public void UpdateItem(Item item)
         {
             if (item == null) return;
@@ -103,9 +121,7 @@ namespace RtmpStreamerPlugin.Admin
                 item.Properties["CameraName"] = _selectedCameraItem.Name;
             }
 
-            var rtmpUrl = _txtRtmpUrl.Text.Trim();
-            if (!string.IsNullOrEmpty(rtmpUrl))
-                item.Properties["RtmpUrl"] = rtmpUrl;
+            item.Properties["RtmpUrl"] = _txtRtmpUrl.Text.Trim();
 
             item.Properties["Enabled"] = _chkEnabled.Checked ? "Yes" : "No";
         }

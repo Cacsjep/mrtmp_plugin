@@ -13,6 +13,7 @@ namespace RtmpStreamerPlugin.Admin
             this._btnSelectCamera = new System.Windows.Forms.Button();
             this._labelRtmpUrl = new System.Windows.Forms.Label();
             this._txtRtmpUrl = new System.Windows.Forms.TextBox();
+            this._lblRtmpExamples = new System.Windows.Forms.Label();
             this._chkEnabled = new System.Windows.Forms.CheckBox();
             this._grpStatus = new System.Windows.Forms.GroupBox();
             this._labelStatus = new System.Windows.Forms.Label();
@@ -78,11 +79,19 @@ namespace RtmpStreamerPlugin.Admin
             this._txtRtmpUrl.TabIndex = 2;
             this._txtRtmpUrl.TextChanged += new System.EventHandler(this.OnUserChange);
 
+            // _lblRtmpExamples
+            this._lblRtmpExamples.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right));
+            this._lblRtmpExamples.ForeColor = System.Drawing.SystemColors.GrayText;
+            this._lblRtmpExamples.Location = new System.Drawing.Point(110, 132);
+            this._lblRtmpExamples.Name = "_lblRtmpExamples";
+            this._lblRtmpExamples.Size = new System.Drawing.Size(400, 30);
+            this._lblRtmpExamples.Text = "Examples:  YouTube: rtmp://a.rtmp.youtube.com/live2/STREAM-KEY\r\n                Twitch: rtmp://live.twitch.tv/app/STREAM-KEY";
+
             // _chkEnabled
             this._chkEnabled.AutoSize = true;
             this._chkEnabled.Checked = true;
             this._chkEnabled.CheckState = System.Windows.Forms.CheckState.Checked;
-            this._chkEnabled.Location = new System.Drawing.Point(110, 142);
+            this._chkEnabled.Location = new System.Drawing.Point(110, 170);
             this._chkEnabled.Name = "_chkEnabled";
             this._chkEnabled.Size = new System.Drawing.Size(65, 17);
             this._chkEnabled.TabIndex = 3;
@@ -96,7 +105,7 @@ namespace RtmpStreamerPlugin.Admin
             this._grpStatus.Controls.Add(this._lblStatusValue);
             this._grpStatus.Controls.Add(this._labelUptime);
             this._grpStatus.Controls.Add(this._lblUptimeValue);
-            this._grpStatus.Location = new System.Drawing.Point(14, 175);
+            this._grpStatus.Location = new System.Drawing.Point(14, 200);
             this._grpStatus.Name = "_grpStatus";
             this._grpStatus.Size = new System.Drawing.Size(496, 70);
             this._grpStatus.TabIndex = 4;
@@ -143,10 +152,11 @@ namespace RtmpStreamerPlugin.Admin
             this.Controls.Add(this._btnSelectCamera);
             this.Controls.Add(this._labelRtmpUrl);
             this.Controls.Add(this._txtRtmpUrl);
+            this.Controls.Add(this._lblRtmpExamples);
             this.Controls.Add(this._chkEnabled);
             this.Controls.Add(this._grpStatus);
             this.Name = "StreamConfigUserControl";
-            this.Size = new System.Drawing.Size(530, 260);
+            this.Size = new System.Drawing.Size(530, 285);
             this._grpStatus.ResumeLayout(false);
             this._grpStatus.PerformLayout();
             this.ResumeLayout(false);
@@ -160,6 +170,7 @@ namespace RtmpStreamerPlugin.Admin
         private System.Windows.Forms.Button _btnSelectCamera;
         private System.Windows.Forms.Label _labelRtmpUrl;
         private System.Windows.Forms.TextBox _txtRtmpUrl;
+        private System.Windows.Forms.Label _lblRtmpExamples;
         private System.Windows.Forms.CheckBox _chkEnabled;
         private System.Windows.Forms.GroupBox _grpStatus;
         private System.Windows.Forms.Label _labelStatus;

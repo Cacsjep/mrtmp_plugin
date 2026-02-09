@@ -23,6 +23,11 @@ namespace RtmpStreamerPlugin.Admin
 
         #region User Control
 
+        public override ItemNodeUserControl GenerateOverviewUserControl()
+        {
+            return new RtmpOverviewUserControl();
+        }
+
         public override UserControl GenerateDetailUserControl()
         {
             _userControl = new StreamConfigUserControl();
@@ -53,8 +58,17 @@ namespace RtmpStreamerPlugin.Admin
 
         public override bool ValidateAndSaveUserControl()
         {
-            if (CurrentItem != null)
+            if (CurrentItem != null && _userControl != null)
             {
+                var error = _userControl.ValidateInput();
+                if (error != null)
+                {
+                    System.Windows.Forms.MessageBox.Show(error, "Validation",
+                        System.Windows.Forms.MessageBoxButtons.OK,
+                        System.Windows.Forms.MessageBoxIcon.Warning);
+                    return false;
+                }
+
                 _userControl.UpdateItem(CurrentItem);
                 Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, CurrentItem);
             }
@@ -100,6 +114,7 @@ namespace RtmpStreamerPlugin.Admin
         {
             CurrentItem = new Item(suggestedFQID, "New RTMP Stream");
             CurrentItem.Properties["Enabled"] = "Yes";
+            CurrentItem.Properties["RtmpUrl"] = "rtmp://";
 
             if (_userControl != null)
                 _userControl.FillContent(CurrentItem);
