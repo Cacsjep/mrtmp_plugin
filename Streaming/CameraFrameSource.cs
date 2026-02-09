@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using VideoOS.Platform;
 using VideoOS.Platform.Live;
 
@@ -95,21 +94,7 @@ namespace RtmpStreamerPlugin.Streaming
 
         private void OnLiveStatus(object sender, EventArgs e)
         {
-            try
-            {
-                PluginLog.Info($"[FrameSource] LiveStatusEvent: {e.GetType().Name}");
-                // Dump all properties
-                foreach (var prop in e.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                {
-                    try
-                    {
-                        var val = prop.GetValue(e);
-                        PluginLog.Info($"[FrameSource]   Status.{prop.Name} = {val}");
-                    }
-                    catch { }
-                }
-            }
-            catch { }
+            // Heartbeat/keepalive from RawLiveSource, no action needed
         }
 
         private void OnLiveContent(object sender, EventArgs e)
@@ -118,75 +103,23 @@ namespace RtmpStreamerPlugin.Streaming
             {
                 _eventsReceived++;
 
-                if (_eventsReceived <= 3 || _eventsReceived % 500 == 0)
-                    PluginLog.Info($"[FrameSource] Event #{_eventsReceived}, EventArgs type={e.GetType().Name}");
-
-                // On first event, dump all properties and fields
-                if (_eventsReceived == 1)
-                {
-                    foreach (var prop in e.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                    {
-                        try
-                        {
-                            var val = prop.GetValue(e);
-                            PluginLog.Info($"[FrameSource]   Prop {prop.Name} ({prop.PropertyType.Name}) = {val}");
-                        }
-                        catch (Exception ex2) { PluginLog.Info($"[FrameSource]   Prop {prop.Name} -> error: {ex2.Message}"); }
-                    }
-                    foreach (var field in e.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
-                    {
-                        try
-                        {
-                            var val = field.GetValue(e);
-                            PluginLog.Info($"[FrameSource]   Field {field.Name} ({field.FieldType.Name}) = {val}");
-                        }
-                        catch (Exception ex2) { PluginLog.Info($"[FrameSource]   Field {field.Name} -> error: {ex2.Message}"); }
-                    }
-                }
-
                 var args = e as LiveContentRawEventArgs;
-                if (args == null)
-                {
-                    if (_eventsReceived <= 3)
-                        PluginLog.Info($"[FrameSource] EventArgs is not LiveContentRawEventArgs, actual: {e.GetType().FullName}");
+                if (args?.LiveContent == null)
                     return;
-                }
-
-                if (args.LiveContent == null)
-                {
-                    if (_eventsReceived <= 3)
-                        PluginLog.Info("[FrameSource] LiveContent is null");
-                    return;
-                }
 
                 byte[] content = args.LiveContent.Content;
                 if (content == null || content.Length <= GenericByteDataParser.HeaderSize)
-                {
-                    if (_eventsReceived <= 3)
-                        PluginLog.Info($"[FrameSource] Content null or too small: {content?.Length ?? 0} bytes");
                     return;
-                }
-
-                if (_eventsReceived <= 3)
-                    PluginLog.Info($"[FrameSource] Content received: {content.Length} bytes, first bytes: {content[0]:X2} {content[1]:X2} {content[6]:X2} {content[7]:X2}");
 
                 if (!GenericByteDataParser.TryParse(content, out var frame))
-                {
-                    if (_eventsReceived <= 5)
-                        PluginLog.Info($"[FrameSource] GenericByteDataParser rejected packet (dataType=0x{((content[0] << 8) | content[1]):X4})");
                     return;
-                }
 
                 if (frame.CodecType != GenericByteDataParser.CodecH264)
-                {
-                    if (_eventsReceived <= 5)
-                        PluginLog.Info($"[FrameSource] Non-H264 codec: 0x{frame.CodecType:X4}");
                     return;
-                }
 
                 _framesEmitted++;
-                if (_framesEmitted <= 3 || _framesEmitted % 500 == 0)
-                    PluginLog.Info($"[FrameSource] H.264 frame #{_framesEmitted}: {frame.PayloadData.Length} bytes, keyframe={frame.IsKeyFrame}");
+                if (_framesEmitted == 1)
+                    PluginLog.Info($"[FrameSource] First H.264 frame: {frame.PayloadData.Length} bytes, keyframe={frame.IsKeyFrame}");
 
                 FrameReceived?.Invoke(frame.PayloadData, frame.IsKeyFrame, frame.PictureTimestamp);
             }

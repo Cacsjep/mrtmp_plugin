@@ -84,8 +84,25 @@ namespace RtmpStreamerHelper
 
                 PluginLog.Info("Stream session started, waiting for exit signal...");
 
+                // Report stats every 5 seconds so BackgroundPlugin can relay to admin
+                var statsTimer = new Timer(_ =>
+                {
+                    if (session != null && session.IsRunning)
+                    {
+                        double fps = session.Uptime.TotalSeconds > 0
+                            ? session.FramesSent / session.Uptime.TotalSeconds
+                            : 0;
+                        Console.Error.WriteLine(string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "STATS frames={0} fps={1:F1} bytes={2} keyframes={3}",
+                            session.FramesSent, fps, session.BytesSent, session.KeyFramesSent));
+                    }
+                }, null, 5000, 5000);
+
                 // Wait until killed by parent or Ctrl+C
                 exitEvent.WaitOne();
+
+                statsTimer.Dispose();
             }
             catch (Exception ex)
             {

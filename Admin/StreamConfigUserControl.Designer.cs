@@ -4,22 +4,14 @@ namespace RtmpStreamerPlugin.Admin
     {
         private System.ComponentModel.IContainer components = null;
 
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
         private void InitializeComponent()
         {
             this._dataGridView = new System.Windows.Forms.DataGridView();
             this._colCamera = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colRtmpUrl = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._colStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this._colFrames = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colFps = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colUptime = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this._btnAdd = new System.Windows.Forms.Button();
             this._btnRemove = new System.Windows.Forms.Button();
             this._labelTitle = new System.Windows.Forms.Label();
@@ -124,7 +116,8 @@ namespace RtmpStreamerPlugin.Admin
                 this._colCamera,
                 this._colRtmpUrl,
                 this._colStatus,
-                this._colFrames
+                this._colFps,
+                this._colUptime
             });
             this._dataGridView.Location = new System.Drawing.Point(14, 170);
             this._dataGridView.MultiSelect = false;
@@ -139,25 +132,31 @@ namespace RtmpStreamerPlugin.Admin
             this._colCamera.HeaderText = "Camera";
             this._colCamera.Name = "_colCamera";
             this._colCamera.ReadOnly = true;
-            this._colCamera.Width = 160;
+            this._colCamera.Width = 150;
 
             // _colRtmpUrl
             this._colRtmpUrl.HeaderText = "RTMP URL";
             this._colRtmpUrl.Name = "_colRtmpUrl";
             this._colRtmpUrl.ReadOnly = true;
-            this._colRtmpUrl.Width = 300;
+            this._colRtmpUrl.Width = 220;
 
             // _colStatus
             this._colStatus.HeaderText = "Status";
             this._colStatus.Name = "_colStatus";
             this._colStatus.ReadOnly = true;
-            this._colStatus.Width = 90;
+            this._colStatus.Width = 80;
 
-            // _colFrames
-            this._colFrames.HeaderText = "Frames";
-            this._colFrames.Name = "_colFrames";
-            this._colFrames.ReadOnly = true;
-            this._colFrames.Width = 80;
+            // _colFps
+            this._colFps.HeaderText = "FPS";
+            this._colFps.Name = "_colFps";
+            this._colFps.ReadOnly = true;
+            this._colFps.Width = 50;
+
+            // _colUptime
+            this._colUptime.HeaderText = "Uptime";
+            this._colUptime.Name = "_colUptime";
+            this._colUptime.ReadOnly = true;
+            this._colUptime.Width = 80;
 
             // _panelButtons
             this._panelButtons.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left));
@@ -200,7 +199,8 @@ namespace RtmpStreamerPlugin.Admin
         private System.Windows.Forms.DataGridViewTextBoxColumn _colCamera;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colRtmpUrl;
         private System.Windows.Forms.DataGridViewTextBoxColumn _colStatus;
-        private System.Windows.Forms.DataGridViewTextBoxColumn _colFrames;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colFps;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colUptime;
         private System.Windows.Forms.Button _btnAdd;
         private System.Windows.Forms.Button _btnRemove;
         private System.Windows.Forms.Label _labelTitle;

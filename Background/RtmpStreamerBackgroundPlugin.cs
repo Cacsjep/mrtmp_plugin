@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading;
+using System.Xml.Linq;
 using RtmpStreamerPlugin.Streaming;
 using VideoOS.Platform;
 using VideoOS.Platform.Background;
@@ -25,6 +26,7 @@ namespace RtmpStreamerPlugin.Background
         private string _helperExePath;
         private string _serverUri;
         private string _milestoneDir;
+        private string _lastStreamConfig; // Track actual config to detect real changes vs status writes
 
         public override Guid Id => RtmpStreamerPluginDefinition.BackgroundPluginId;
         public override string Name => "RTMP Streamer Background";
@@ -96,6 +98,7 @@ namespace RtmpStreamerPlugin.Background
             }
 
             StopAllHelpers();
+            WriteHelperStatus(); // Write final "Stopped" status
         }
 
         private void LoadAndStartStreams()
@@ -124,7 +127,13 @@ namespace RtmpStreamerPlugin.Background
                     }
                 }
 
+                // Snapshot the current stream config for change detection
+                _lastStreamConfig = GetStreamConfigSnapshot();
+
                 PluginLog.Info($"Loaded streams. Active helpers: {_helpers.Count}");
+
+                // Write initial status
+                WriteHelperStatus();
             }
             catch (Exception ex)
             {
@@ -170,11 +179,19 @@ namespace RtmpStreamerPlugin.Background
                     RestartCount = 0
                 };
 
-                // Read stderr async for logging
+                // Read stderr async for logging and stats parsing
                 process.ErrorDataReceived += (s, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
-                        PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
+                    if (string.IsNullOrEmpty(e.Data)) return;
+
+                    // Parse STATS lines: "STATS frames=1234 fps=25.0 bytes=5678900 keyframes=50"
+                    if (e.Data.StartsWith("STATS "))
+                    {
+                        ParseStats(helper, e.Data);
+                        return;
+                    }
+
+                    PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
                 };
                 process.BeginErrorReadLine();
 
@@ -241,6 +258,7 @@ namespace RtmpStreamerPlugin.Background
                         // Preserve restart count
                         if (_helpers.TryGetValue(key, out var newHelper))
                             newHelper.RestartCount = restartCount;
+
                     }
                 }
                 catch (Exception ex)
@@ -248,11 +266,85 @@ namespace RtmpStreamerPlugin.Background
                     PluginLog.Error($"Monitor error for {helper.CameraName}: {ex.Message}");
                 }
             }
+
+            // Update status periodically so admin can see uptime
+            WriteHelperStatus();
+        }
+
+        /// <summary>
+        /// Write current helper status to config items so the Admin plugin can display it.
+        /// </summary>
+        private void WriteHelperStatus()
+        {
+            try
+            {
+                var configItems = Configuration.Instance.GetItemConfigurations(
+                    RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
+
+                foreach (var item in configItems)
+                {
+                    var statusRoot = new XElement("HelperStatus");
+                    foreach (var helper in _helpers.Values)
+                    {
+                        bool alive = false;
+                        try { alive = helper.Process != null && !helper.Process.HasExited; } catch { }
+
+                        statusRoot.Add(new XElement("Helper",
+                            new XAttribute("CameraId", helper.CameraId),
+                            new XAttribute("Status", alive ? "Streaming" : "Stopped"),
+                            new XAttribute("PID", helper.Process?.Id ?? 0),
+                            new XAttribute("StartTime", helper.StartTime.ToString("o")),
+                            new XAttribute("Restarts", helper.RestartCount),
+                            new XAttribute("Frames", helper.Frames),
+                            new XAttribute("Fps", helper.Fps.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)),
+                            new XAttribute("Bytes", helper.Bytes),
+                            new XAttribute("KeyFrames", helper.KeyFrames)
+                        ));
+                    }
+
+                    item.Properties["StreamStatus"] = statusRoot.ToString();
+                    Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, item);
+                }
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error($"Error writing helper status: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Snapshot the current StreamConfig values to detect real config changes.
+        /// </summary>
+        private string GetStreamConfigSnapshot()
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                var configItems = Configuration.Instance.GetItemConfigurations(
+                    RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
+
+                foreach (var item in configItems)
+                {
+                    if (item.Properties.ContainsKey("StreamConfig"))
+                        sb.Append(item.Properties["StreamConfig"]);
+                }
+                return sb.ToString();
+            }
+            catch
+            {
+                return "";
+            }
         }
 
         private object OnConfigurationChanged(Message message, FQID dest, FQID sender)
         {
-            PluginLog.Info("Configuration changed, reloading streams");
+            // Check if the actual stream configuration changed (not just a status update)
+            var currentConfig = GetStreamConfigSnapshot();
+            if (currentConfig == _lastStreamConfig)
+                return null; // Status write or no real change, ignore
+
+            PluginLog.Info("Stream configuration changed, reloading helpers");
+            _lastStreamConfig = currentConfig;
 
             try
             {
@@ -267,6 +359,33 @@ namespace RtmpStreamerPlugin.Background
             return null;
         }
 
+        private static void ParseStats(HelperProcess helper, string line)
+        {
+            // "STATS frames=1234 fps=25.0 bytes=5678900 keyframes=50"
+            foreach (var part in line.Split(' '))
+            {
+                var kv = part.Split('=');
+                if (kv.Length != 2) continue;
+
+                switch (kv[0])
+                {
+                    case "frames":
+                        long.TryParse(kv[1], out helper.Frames);
+                        break;
+                    case "fps":
+                        double.TryParse(kv[1], System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out helper.Fps);
+                        break;
+                    case "bytes":
+                        long.TryParse(kv[1], out helper.Bytes);
+                        break;
+                    case "keyframes":
+                        long.TryParse(kv[1], out helper.KeyFrames);
+                        break;
+                }
+            }
+        }
+
         private class HelperProcess
         {
             public Process Process;
@@ -275,6 +394,10 @@ namespace RtmpStreamerPlugin.Background
             public string RtmpUrl;
             public DateTime StartTime;
             public int RestartCount;
+            public long Frames;
+            public double Fps;
+            public long Bytes;
+            public long KeyFrames;
         }
     }
 }

@@ -100,11 +100,9 @@ if not exist "$(MipPluginDir)" mkdir "$(MipPluginDir)"
 exit /b 0
     </PreBuildEvent>
     <PostBuildEvent>
-copy /y "$(TargetPath)" "$(MipPluginDir)" &gt;nul
-copy /y "$(TargetDir)$(TargetName).pdb" "$(MipPluginDir)" 2&gt;nul
+xcopy /y /d /e /i "$(TargetDir)*" "$(MipPluginDir)" &gt;nul
 copy /y "$(ProjectDir)plugin.def" "$(MipPluginDir)" &gt;nul
-copy /y "$(ProjectDir)RtmpStreamerHelper\bin\x64\$(ConfigurationName)\RtmpStreamerHelper.exe" "$(MipPluginDir)" 2&gt;nul
-copy /y "$(ProjectDir)RtmpStreamerHelper\bin\x64\$(ConfigurationName)\RtmpStreamerHelper.pdb" "$(MipPluginDir)" 2&gt;nul
+xcopy /y /d /e /i "$(ProjectDir)RtmpStreamerHelper\bin\x64\$(ConfigurationName)\*" "$(MipPluginDir)" &gt;nul
 net start MilestoneEventServerService 2&gt;nul
 start "" "C:\Program Files\Milestone\XProtect Management Client\VideoOS.Administration.exe" 2&gt;nul
 exit /b 0

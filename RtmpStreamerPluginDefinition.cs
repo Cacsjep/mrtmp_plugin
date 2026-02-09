@@ -20,7 +20,7 @@ namespace RtmpStreamerPlugin
 
         public override Guid Id => PluginId;
         public override string Name => "RTMP Streamer";
-        public override string SharedNodeName => "RTMP Stre";
+        public override string SharedNodeName => "RTMP Streamer";
         public override string VersionString => "1.0.0.0";
 
         public override Image Icon => _icon ?? _defaultIcon;
