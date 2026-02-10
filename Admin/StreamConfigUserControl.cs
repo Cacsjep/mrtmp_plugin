@@ -170,37 +170,65 @@ namespace RtmpStreamerPlugin.Admin
             _lblStatsValue.Text = "";
             _dgvLog.Rows.Clear();
 
-            try
+            // Do all MessageCommunication work off the UI thread —
+            // Start() can block for seconds on first call.
+            var capturedItemId = itemId;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
-                var serverId = EnvironmentManager.Instance.MasterSite.ServerId;
-                // Start() is called in ItemManager.Init() on a background thread.
-                // Calling it again here is idempotent and fast if already started.
-                MessageCommunicationManager.Start(serverId);
-                _mc = MessageCommunicationManager.Get(serverId);
+                try
+                {
+                    var serverId = EnvironmentManager.Instance.MasterSite.ServerId;
+                    MessageCommunicationManager.Start(serverId);
+                    var mc = MessageCommunicationManager.Get(serverId);
 
-                _statusUpdateFilter = _mc.RegisterCommunicationFilter(
-                    OnStatusMessage,
-                    new CommunicationIdFilter(StreamMessageIds.StatusUpdate));
+                    // Check we haven't been unsubscribed/switched while waiting
+                    if (_subscribedItemId != capturedItemId) return;
 
-                _statusResponseFilter = _mc.RegisterCommunicationFilter(
-                    OnStatusMessage,
-                    new CommunicationIdFilter(StreamMessageIds.StatusResponse));
+                    _mc = mc;
 
-                // Request initial state
-                var request = new StreamStatusRequest { ItemId = itemId };
-                _mc.TransmitMessage(
-                    new VideoOS.Platform.Messaging.Message(StreamMessageIds.StatusRequest, request), null, null, null);
+                    _statusUpdateFilter = _mc.RegisterCommunicationFilter(
+                        OnStatusMessage,
+                        new CommunicationIdFilter(StreamMessageIds.StatusUpdate));
 
-                // Timeout: if no response in 3 seconds, show message
-                _responseTimer = new Timer { Interval = 3000 };
-                _responseTimer.Tick += OnResponseTimeout;
-                _responseTimer.Start();
-            }
-            catch (Exception)
-            {
-                _lblStatusValue.Text = "Event Server not reachable";
-                _lblStatusValue.ForeColor = SystemColors.GrayText;
-            }
+                    _statusResponseFilter = _mc.RegisterCommunicationFilter(
+                        OnStatusMessage,
+                        new CommunicationIdFilter(StreamMessageIds.StatusResponse));
+
+                    // Request initial state
+                    var request = new StreamStatusRequest { ItemId = capturedItemId };
+                    _mc.TransmitMessage(
+                        new VideoOS.Platform.Messaging.Message(StreamMessageIds.StatusRequest, request), null, null, null);
+
+                    // Start timeout timer on UI thread
+                    if (_subscribedItemId == capturedItemId)
+                    {
+                        try
+                        {
+                            BeginInvoke(new Action(() =>
+                            {
+                                if (_subscribedItemId != capturedItemId) return;
+                                _responseTimer = new Timer { Interval = 3000 };
+                                _responseTimer.Tick += OnResponseTimeout;
+                                _responseTimer.Start();
+                            }));
+                        }
+                        catch (ObjectDisposedException) { }
+                    }
+                }
+                catch (Exception)
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(() =>
+                        {
+                            if (_subscribedItemId != capturedItemId) return;
+                            _lblStatusValue.Text = "Event Server not reachable";
+                            _lblStatusValue.ForeColor = SystemColors.GrayText;
+                        }));
+                    }
+                    catch (ObjectDisposedException) { }
+                }
+            });
         }
 
         internal void UnsubscribeLiveStatus()
