@@ -10,8 +10,6 @@
     <AssemblyName>RtmpStreamerHelper</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <MilestoneInstallDir Condition=" '$(MilestoneInstallDir)' == '' ">C:\Program Files\Milestone\XProtect Event Server\</MilestoneInstallDir>
-    <MilestoneRecServerDir Condition=" '$(MilestoneRecServerDir)' == '' ">C:\Program Files\Milestone\XProtect Recording Server\</MilestoneRecServerDir>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
     <PlatformTarget>x64</PlatformTarget>
@@ -37,18 +35,8 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="VideoOS.Platform">
-      <HintPath>$(MilestoneInstallDir)VideoOS.Platform.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="VideoOS.Platform.SDK">
-      <HintPath>$(MilestoneRecServerDir)VideoOS.Platform.SDK.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="VideoOS.Platform.SDK.Media">
-      <HintPath>$(MilestoneRecServerDir)VideoOS.Platform.SDK.Media.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <PackageReference Include="MilestoneSystems.VideoOS.Platform" Version="*" />
+    <PackageReference Include="MilestoneSystems.VideoOS.Platform.SDK" Version="*" />
   </ItemGroup>
   <ItemGroup>
     <!-- Helper-specific files -->
