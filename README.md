@@ -1,4 +1,4 @@
-# Unofficial/Independent Milestone XProtect® RTMP Streamer Plugin
+# Milestone XProtect® RTMP Streamer Plugin (Unofficial/Independent)
 
 > [!IMPORTANT]
 > This is an independent open source project and is **not affiliated with, endorsed by, or supported by Milestone Systems**. XProtect® is a registered trademark of Milestone Systems A/S.
