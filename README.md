@@ -203,9 +203,6 @@ The CI build uses `/p:PreBuildEvent= /p:PostBuildEvent=` to skip the Milestone s
 
 - **H.264 only** -- cameras must be configured with H.264 encoding (not H.265 or MJPEG)
 - **Silent audio only** -- the AAC audio track is silent (camera audio is not captured)
-- **One helper per stream** -- each camera-to-RTMP mapping runs in its own process
-- **Windows only** -- requires Milestone XProtect® which runs on Windows
-- **No transcoding** -- the H.264 stream is passed through as-is; resolution and bitrate are determined by the camera configuration in XProtect®
 
 ## License
 
