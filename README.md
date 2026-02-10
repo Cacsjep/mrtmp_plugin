@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/dbdcbe12-9d3f-43e5-a263-813a289ad126
 - Milestone XProtect® (Professional+, Expert, Corporate, or Essential+)
 - Event Server (for the BackgroundPlugin)
 - Management Client (for configuration)
-- Cameras configured with **H.264 encoding** (H.265 and MJPEG are not supported)
+- Cameras configured with **H.264** (H.265 and MJPEG are not supported)
 
 ## Installation
 
