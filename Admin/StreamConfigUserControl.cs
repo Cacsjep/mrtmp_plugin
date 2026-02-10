@@ -2,7 +2,6 @@ using RtmpStreamerPlugin.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -14,14 +13,16 @@ namespace RtmpStreamerPlugin.Admin
 {
     public partial class StreamConfigUserControl : UserControl
     {
-        private Item _currentItem;
         private Item _selectedCameraItem;
+        private Guid _currentItemId;
 
         private MessageCommunication _mc;
         private object _statusUpdateFilter;
         private object _statusResponseFilter;
         private Guid _subscribedItemId;
         private Timer _responseTimer;
+        private int _subscribeGeneration;
+        private int _lastLogHash;
 
         private static readonly Regex LogLineRegex = new Regex(
             @"^(\d{2}:\d{2}:\d{2}\.\d{3})\s+(DEBUG|INFO|WARN|ERROR)\s+(.*)$",
@@ -53,13 +54,13 @@ namespace RtmpStreamerPlugin.Admin
 
         public void FillContent(Item item)
         {
-            _currentItem = item;
             if (item == null)
             {
                 ClearContent();
                 return;
             }
 
+            _currentItemId = item.FQID.ObjectId;
             _txtName.Text = item.Name;
 
             // Load camera
@@ -103,7 +104,10 @@ namespace RtmpStreamerPlugin.Admin
             _chkAllowUntrustedCerts.Checked = item.Properties.ContainsKey("AllowUntrustedCerts")
                 && item.Properties["AllowUntrustedCerts"] == "Yes";
 
-            SubscribeLiveStatus(item.FQID.ObjectId);
+            if (_chkEnabled.Checked)
+                SubscribeLiveStatus(item.FQID.ObjectId);
+            else
+                ShowDisabledStatus();
         }
 
         public string ValidateInput()
@@ -146,7 +150,7 @@ namespace RtmpStreamerPlugin.Admin
         {
             UnsubscribeLiveStatus();
 
-            _currentItem = null;
+            _currentItemId = Guid.Empty;
             _selectedCameraItem = null;
             _txtName.Text = "";
             _btnSelectCamera.Text = "(Select camera...)";
@@ -165,14 +169,15 @@ namespace RtmpStreamerPlugin.Admin
             UnsubscribeLiveStatus();
 
             _subscribedItemId = itemId;
+            var generation = ++_subscribeGeneration;
             _lblStatusValue.Text = "Waiting for status...";
             _lblStatusValue.ForeColor = SystemColors.ControlText;
             _lblStatsValue.Text = "";
+            _lastLogHash = 0;
             _dgvLog.Rows.Clear();
 
             // Do all MessageCommunication work off the UI thread —
             // Start() can block for seconds on first call.
-            var capturedItemId = itemId;
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
@@ -181,39 +186,49 @@ namespace RtmpStreamerPlugin.Admin
                     MessageCommunicationManager.Start(serverId);
                     var mc = MessageCommunicationManager.Get(serverId);
 
-                    // Check we haven't been unsubscribed/switched while waiting
-                    if (_subscribedItemId != capturedItemId) return;
-
-                    _mc = mc;
-
-                    _statusUpdateFilter = _mc.RegisterCommunicationFilter(
+                    // Register filters before checking generation — we'll clean up if stale
+                    var updateFilter = mc.RegisterCommunicationFilter(
                         OnStatusMessage,
                         new CommunicationIdFilter(StreamMessageIds.StatusUpdate));
 
-                    _statusResponseFilter = _mc.RegisterCommunicationFilter(
+                    var responseFilter = mc.RegisterCommunicationFilter(
                         OnStatusMessage,
                         new CommunicationIdFilter(StreamMessageIds.StatusResponse));
 
-                    // Request initial state
-                    var request = new StreamStatusRequest { ItemId = capturedItemId };
-                    _mc.TransmitMessage(
-                        new VideoOS.Platform.Messaging.Message(StreamMessageIds.StatusRequest, request), null, null, null);
-
-                    // Start timeout timer on UI thread
-                    if (_subscribedItemId == capturedItemId)
+                    // Marshal field stores to UI thread to avoid racing with UnsubscribeLiveStatus
+                    try
                     {
-                        try
+                        BeginInvoke(new Action(() =>
                         {
-                            BeginInvoke(new Action(() =>
+                            if (_subscribeGeneration != generation)
                             {
-                                if (_subscribedItemId != capturedItemId) return;
-                                _responseTimer = new Timer { Interval = 3000 };
-                                _responseTimer.Tick += OnResponseTimeout;
-                                _responseTimer.Start();
-                            }));
-                        }
-                        catch (ObjectDisposedException) { }
+                                // Stale — user switched items while we were connecting.
+                                // Unregister the orphaned filters immediately.
+                                mc.UnRegisterCommunicationFilter(updateFilter);
+                                mc.UnRegisterCommunicationFilter(responseFilter);
+                                return;
+                            }
+
+                            _mc = mc;
+                            _statusUpdateFilter = updateFilter;
+                            _statusResponseFilter = responseFilter;
+
+                            _responseTimer = new Timer { Interval = 3000 };
+                            _responseTimer.Tick += OnResponseTimeout;
+                            _responseTimer.Start();
+                        }));
                     }
+                    catch (ObjectDisposedException)
+                    {
+                        mc.UnRegisterCommunicationFilter(updateFilter);
+                        mc.UnRegisterCommunicationFilter(responseFilter);
+                        return;
+                    }
+
+                    // Request initial state (safe to do even if filters get cleaned up)
+                    var request = new StreamStatusRequest { ItemId = itemId };
+                    mc.TransmitMessage(
+                        new VideoOS.Platform.Messaging.Message(StreamMessageIds.StatusRequest, request), null, null, null);
                 }
                 catch (Exception)
                 {
@@ -221,7 +236,7 @@ namespace RtmpStreamerPlugin.Admin
                     {
                         BeginInvoke(new Action(() =>
                         {
-                            if (_subscribedItemId != capturedItemId) return;
+                            if (_subscribeGeneration != generation) return;
                             _lblStatusValue.Text = "Event Server not reachable";
                             _lblStatusValue.ForeColor = SystemColors.GrayText;
                         }));
@@ -333,29 +348,40 @@ namespace RtmpStreamerPlugin.Admin
                     : "";
             }
 
-            // Log grid
+            // Log grid — only rebuild when content actually changed
             if (update.RecentLogLines != null && update.RecentLogLines.Count > 0)
             {
-                _dgvLog.Rows.Clear();
-                foreach (var line in update.RecentLogLines)
+                var logHash = update.RecentLogLines.Count;
+                unchecked
                 {
-                    var match = LogLineRegex.Match(line);
-                    int rowIdx;
-                    if (match.Success)
-                    {
-                        rowIdx = _dgvLog.Rows.Add(match.Groups[1].Value, match.Groups[2].Value, match.Groups[3].Value);
-                        var levelColor = GetLevelColor(match.Groups[2].Value);
-                        _dgvLog.Rows[rowIdx].Cells[1].Style.ForeColor = levelColor;
-                        _dgvLog.Rows[rowIdx].Cells[1].Style.SelectionForeColor = levelColor;
-                    }
-                    else
-                    {
-                        rowIdx = _dgvLog.Rows.Add("", "", line);
-                    }
+                    for (int i = 0; i < update.RecentLogLines.Count; i++)
+                        logHash = logHash * 31 + (update.RecentLogLines[i]?.GetHashCode() ?? 0);
                 }
 
-                if (_dgvLog.Rows.Count > 0)
-                    _dgvLog.FirstDisplayedScrollingRowIndex = _dgvLog.Rows.Count - 1;
+                if (logHash != _lastLogHash)
+                {
+                    _lastLogHash = logHash;
+                    _dgvLog.Rows.Clear();
+                    foreach (var line in update.RecentLogLines)
+                    {
+                        var match = LogLineRegex.Match(line);
+                        int rowIdx;
+                        if (match.Success)
+                        {
+                            rowIdx = _dgvLog.Rows.Add(match.Groups[1].Value, match.Groups[2].Value, match.Groups[3].Value);
+                            var levelColor = GetLevelColor(match.Groups[2].Value);
+                            _dgvLog.Rows[rowIdx].Cells[1].Style.ForeColor = levelColor;
+                            _dgvLog.Rows[rowIdx].Cells[1].Style.SelectionForeColor = levelColor;
+                        }
+                        else
+                        {
+                            rowIdx = _dgvLog.Rows.Add("", "", line);
+                        }
+                    }
+
+                    if (_dgvLog.Rows.Count > 0)
+                        _dgvLog.FirstDisplayedScrollingRowIndex = _dgvLog.Rows.Count - 1;
+                }
             }
         }
 
@@ -403,8 +429,24 @@ namespace RtmpStreamerPlugin.Admin
 
         internal void OnUserChange(object sender, EventArgs e)
         {
-            if (ConfigurationChangedByUser != null)
-                ConfigurationChangedByUser(this, new EventArgs());
+            if (sender == _chkEnabled && _currentItemId != Guid.Empty)
+            {
+                if (!_chkEnabled.Checked)
+                    ShowDisabledStatus();
+                else
+                    SubscribeLiveStatus(_currentItemId);
+            }
+
+            ConfigurationChangedByUser?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ShowDisabledStatus()
+        {
+            UnsubscribeLiveStatus();
+            _lblStatusValue.Text = "Disabled";
+            _lblStatusValue.ForeColor = SystemColors.GrayText;
+            _lblStatsValue.Text = "";
+            _dgvLog.Rows.Clear();
         }
     }
 }

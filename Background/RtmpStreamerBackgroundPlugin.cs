@@ -229,7 +229,7 @@ namespace RtmpStreamerPlugin.Background
                                 SystemLog.StreamStopped(cameraName);
                         }
 
-                        TransmitStatusUpdate(helper.ItemId);
+                        TransmitStatusUpdate(helper.ItemId, force: true);
                         return;
                     }
 
@@ -380,9 +380,18 @@ namespace RtmpStreamerPlugin.Background
             };
         }
 
-        private void TransmitStatusUpdate(Guid itemId)
+        private void TransmitStatusUpdate(Guid itemId, bool force = false)
         {
             if (_mc == null) return;
+
+            if (!force && _helpers.TryGetValue(itemId, out var h))
+            {
+                var now = DateTime.UtcNow;
+                if ((now - h.LastTransmitTime).TotalMilliseconds < 500)
+                    return;
+                h.LastTransmitTime = now;
+            }
+
             try
             {
                 var update = BuildStatusUpdate(itemId);
@@ -456,6 +465,7 @@ namespace RtmpStreamerPlugin.Background
             public double Fps;
             public long Bytes;
             public long KeyFrames;
+            public DateTime LastTransmitTime;
 
             private const int MaxLogLines = 40;
             private readonly object _logLock = new object();
