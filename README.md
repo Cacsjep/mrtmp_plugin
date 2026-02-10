@@ -16,19 +16,6 @@ A Milestone XProtect® MIP plugin that streams live camera video to RTMP/RTMPS d
 
 https://github.com/user-attachments/assets/dbdcbe12-9d3f-43e5-a263-813a289ad126
 
-## Features
-
-- **H.264 passthrough** -- no transcoding, direct from XProtect® camera to RTMP server
-- **Silent AAC audio track** -- YouTube, Twitch, and Facebook require audio; automatically injected
-- **RTMPS (TLS) support** -- required by Twitch and Facebook Live
-- **Allow untrusted certificates** -- for self-signed RTMPS servers
-- **H.264 codec validation** -- detects H.265/MJPEG cameras and reports clear error
-- **Auto-restart** -- crashed helper processes are automatically restarted
-- **Management Client integration** -- configure streams, see status icons (green/red/grey) in the tree
-- **Live log** -- real-time helper process output visible in the Management Client detail panel
-- **Milestone System Log** -- stream connect/disconnect/error/crash events visible in MC System Log
-- **Multiple streams** -- one helper process per camera, fully independent
-
 ## Requirements
 
 - Milestone XProtect® (Professional+, Expert, Corporate, or Essential+)
