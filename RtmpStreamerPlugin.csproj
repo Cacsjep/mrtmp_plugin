@@ -74,9 +74,15 @@
     <Compile Include="Rtmp\SilentAacGenerator.cs" />
     <Compile Include="Rtmp\RtmpChunkWriter.cs" />
     <Compile Include="Messaging\StreamStatusData.cs" />
+    <Compile Include="Admin\HtmlHelpUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="SystemLog.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Admin\HelpPage.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="plugin.def">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
