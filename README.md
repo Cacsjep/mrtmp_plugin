@@ -2,7 +2,6 @@
 
 [![Build & Release](https://github.com/Cacsjep/mrtmp_plugin/actions/workflows/build-release.yml/badge.svg)](https://github.com/Cacsjep/mrtmp_plugin/actions/workflows/build-release.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Cacsjep/mrtmp_plugin)](https://github.com/Cacsjep/mrtmp_plugin/releases/latest)
-[![GitHub Downloads](https://img.shields.io/github/downloads/Cacsjep/mrtmp_plugin/total)](https://github.com/Cacsjep/mrtmp_plugin/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/Cacsjep/mrtmp_plugin)](https://github.com/Cacsjep/mrtmp_plugin/issues)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/Cacsjep/mrtmp_plugin/security/dependabot)
