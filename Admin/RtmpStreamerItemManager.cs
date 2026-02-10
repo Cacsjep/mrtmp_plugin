@@ -23,11 +23,6 @@ namespace RtmpStreamerPlugin.Admin
 
         #region User Control
 
-        public override ItemNodeUserControl GenerateOverviewUserControl()
-        {
-            return new RtmpOverviewUserControl();
-        }
-
         public override UserControl GenerateDetailUserControl()
         {
             _userControl = new StreamConfigUserControl();
@@ -38,7 +33,10 @@ namespace RtmpStreamerPlugin.Admin
         public override void ReleaseUserControl()
         {
             if (_userControl != null)
+            {
                 _userControl.ConfigurationChangedByUser -= new EventHandler(ConfigurationChangedByUserHandler);
+                _userControl.UnsubscribeLiveStatus();
+            }
             _userControl = null;
         }
 

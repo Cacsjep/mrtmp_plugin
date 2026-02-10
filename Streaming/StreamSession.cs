@@ -140,7 +140,7 @@ namespace RtmpStreamerPlugin.Streaming
                     _lastError = ex.Message;
                     var errorMsg = ClassifyError(ex);
                     EmitStatus($"Error: {errorMsg}");
-                    Log($"Error: {ex.Message}");
+                    LogError($"Error: {ex.Message}");
                 }
 
                 Cleanup();
@@ -225,8 +225,6 @@ namespace RtmpStreamerPlugin.Streaming
                         Log("First frame sent successfully, stream is live");
                     }
 
-                    if (_framesSent <= 3 || _framesSent % 500 == 0)
-                        Log($"Frame #{_framesSent}: {flvPayload.Length} bytes, ts={rtmpTimestamp}ms, keyframe={isKeyFrame}");
                 }
             }
             catch (Exception ex)
@@ -234,7 +232,7 @@ namespace RtmpStreamerPlugin.Streaming
                 _lastError = ex.Message;
                 var errorMsg = ClassifyError(ex);
                 EmitStatus($"Error: {errorMsg}");
-                Log($"Send error: {ex.Message}");
+                LogError($"Send error: {ex.Message}");
                 // Trigger reconnect by cancelling
                 try { _cts?.Cancel(); } catch { }
             }
@@ -243,7 +241,7 @@ namespace RtmpStreamerPlugin.Streaming
         private void OnFrameError(string message)
         {
             _lastError = message;
-            Log($"Frame source error: {message}");
+            LogError($"Frame source error: {message}");
 
             // Emit codec errors as status so they show in Management Client
             if (message.Contains("codec"))
@@ -273,6 +271,11 @@ namespace RtmpStreamerPlugin.Streaming
         private void Log(string message)
         {
             PluginLog.Info($"[Session:{_sessionId}] {message}");
+        }
+
+        private void LogError(string message)
+        {
+            PluginLog.Error($"[Session:{_sessionId}] {message}");
         }
 
         /// <summary>

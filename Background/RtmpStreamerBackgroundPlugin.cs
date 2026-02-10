@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading;
+using RtmpStreamerPlugin.Messaging;
 using VideoOS.Platform;
 using VideoOS.Platform.Background;
 using VideoOS.Platform.Messaging;
@@ -20,6 +22,9 @@ namespace RtmpStreamerPlugin.Background
         private string _serverUri;
         private string _milestoneDir;
         private string _lastConfigSnapshot;
+
+        private MessageCommunication _mc;
+        private object _statusRequestFilter;
 
         public override Guid Id => RtmpStreamerPluginDefinition.BackgroundPluginId;
         public override string Name => "RTMP Streamer Background";
@@ -67,6 +72,21 @@ namespace RtmpStreamerPlugin.Background
 
             SystemLog.Register();
 
+            try
+            {
+                var mcServerId = EnvironmentManager.Instance.MasterSite.ServerId;
+                MessageCommunicationManager.Start(mcServerId);
+                _mc = MessageCommunicationManager.Get(mcServerId);
+                _statusRequestFilter = _mc.RegisterCommunicationFilter(
+                    OnStatusRequest,
+                    new CommunicationIdFilter(StreamMessageIds.StatusRequest));
+                PluginLog.Info("MessageCommunication initialized for live status");
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error($"Failed to init MessageCommunication: {ex.Message}", ex);
+            }
+
             LoadAndStartStreams();
 
             SystemLog.PluginStarted(_helpers.Count);
@@ -87,6 +107,13 @@ namespace RtmpStreamerPlugin.Background
                 EnvironmentManager.Instance.UnRegisterReceiver(_configMessageObj);
                 _configMessageObj = null;
             }
+
+            if (_mc != null && _statusRequestFilter != null)
+            {
+                _mc.UnRegisterCommunicationFilter(_statusRequestFilter);
+                _statusRequestFilter = null;
+            }
+            _mc = null;
 
             SystemLog.PluginStopped();
 
@@ -172,24 +199,29 @@ namespace RtmpStreamerPlugin.Background
                 process.ErrorDataReceived += (s, e) =>
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
+
                     if (e.Data.StartsWith("STATS "))
                     {
                         ParseStats(helper, e.Data);
+                        TransmitStatusUpdate(helper.ItemId);
                         return;
                     }
+
                     if (e.Data.StartsWith("STATUS "))
                     {
                         var newStatus = e.Data.Substring(7);
+                        var prev = helper.LastStatus ?? "";
+                        helper.LastStatus = newStatus;
+
                         // Only persist significant state changes to avoid constant config saves.
                         // Transient states (Connecting, Reconnecting, Initializing, Waiting)
-                        // stay in logs but don't update the item property.
+                        // are shown live via MessageCommunication but don't update item properties.
                         if (newStatus.StartsWith("Streaming") ||
                             newStatus.StartsWith("Error") ||
                             newStatus.StartsWith("Codec") ||
                             newStatus == "Stopped")
                         {
-                            var prev = helper.LastStatus ?? "";
-                            helper.LastStatus = newStatus;
+                            helper.LastPersistableStatus = newStatus;
 
                             // Write to Milestone System Log on significant transitions
                             if (newStatus.StartsWith("Streaming") && !prev.StartsWith("Streaming"))
@@ -200,9 +232,14 @@ namespace RtmpStreamerPlugin.Background
                             else if (newStatus == "Stopped" && prev != "Stopped")
                                 SystemLog.StreamStopped(cameraName);
                         }
+
+                        TransmitStatusUpdate(helper.ItemId);
                         return;
                     }
+
+                    helper.AddLogLine(e.Data);
                     PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
+                    TransmitStatusUpdate(helper.ItemId);
                 };
                 process.BeginErrorReadLine();
 
@@ -295,8 +332,8 @@ namespace RtmpStreamerPlugin.Background
                         bool alive = false;
                         try { alive = helper.Process != null && !helper.Process.HasExited; } catch { }
 
-                        if (!string.IsNullOrEmpty(helper.LastStatus))
-                            status = helper.LastStatus;
+                        if (!string.IsNullOrEmpty(helper.LastPersistableStatus))
+                            status = helper.LastPersistableStatus;
                         else
                             status = alive ? "Starting" : "Stopped";
 
@@ -377,6 +414,69 @@ namespace RtmpStreamerPlugin.Background
             return null;
         }
 
+        private StreamStatusUpdate BuildStatusUpdate(Guid itemId)
+        {
+            if (!_helpers.TryGetValue(itemId, out var helper))
+            {
+                return new StreamStatusUpdate
+                {
+                    ItemId = itemId,
+                    Status = "Stopped",
+                    RecentLogLines = new List<string>(),
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+
+            return new StreamStatusUpdate
+            {
+                ItemId = itemId,
+                Status = helper.LastStatus ?? "Starting",
+                Frames = helper.Frames,
+                Fps = helper.Fps,
+                Bytes = helper.Bytes,
+                KeyFrames = helper.KeyFrames,
+                RestartCount = helper.RestartCount,
+                RecentLogLines = helper.GetLogSnapshot(),
+                Timestamp = DateTime.UtcNow
+            };
+        }
+
+        private void TransmitStatusUpdate(Guid itemId)
+        {
+            if (_mc == null) return;
+            try
+            {
+                var update = BuildStatusUpdate(itemId);
+                _mc.TransmitMessage(
+                    new Message(StreamMessageIds.StatusUpdate, update), null, null, null);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error($"Failed to transmit status update: {ex.Message}");
+            }
+        }
+
+        private object OnStatusRequest(Message message, FQID dest, FQID source)
+        {
+            var request = message.Data as StreamStatusRequest;
+            if (request == null) return null;
+
+            var update = BuildStatusUpdate(request.ItemId);
+            if (_mc != null)
+            {
+                try
+                {
+                    _mc.TransmitMessage(
+                        new Message(StreamMessageIds.StatusResponse, update), null, null, null);
+                }
+                catch (Exception ex)
+                {
+                    PluginLog.Error($"Failed to send status response: {ex.Message}");
+                }
+            }
+            return null;
+        }
+
         private static void ParseStats(HelperProcess helper, string line)
         {
             foreach (var part in line.Split(' '))
@@ -413,12 +513,35 @@ namespace RtmpStreamerPlugin.Background
             public bool AllowUntrustedCerts;
             public int RestartCount;
             public volatile string LastStatus;
+            public volatile string LastPersistableStatus;
             public string LastWrittenStatus;
             public string LastWrittenRestarts;
             public long Frames;
             public double Fps;
             public long Bytes;
             public long KeyFrames;
+
+            private const int MaxLogLines = 40;
+            private readonly object _logLock = new object();
+            private readonly Queue<string> _logLines = new Queue<string>();
+
+            public void AddLogLine(string line)
+            {
+                lock (_logLock)
+                {
+                    if (_logLines.Count >= MaxLogLines)
+                        _logLines.Dequeue();
+                    _logLines.Enqueue(line);
+                }
+            }
+
+            public List<string> GetLogSnapshot()
+            {
+                lock (_logLock)
+                {
+                    return new List<string>(_logLines);
+                }
+            }
         }
     }
 }

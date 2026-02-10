@@ -16,6 +16,16 @@ namespace RtmpStreamerPlugin.Admin
             this._lblRtmpExamples = new System.Windows.Forms.Label();
             this._chkEnabled = new System.Windows.Forms.CheckBox();
             this._chkAllowUntrustedCerts = new System.Windows.Forms.CheckBox();
+            this._grpLiveStatus = new System.Windows.Forms.GroupBox();
+            this._lblStatusLabel = new System.Windows.Forms.Label();
+            this._lblStatusValue = new System.Windows.Forms.Label();
+            this._lblStatsValue = new System.Windows.Forms.Label();
+            this._dgvLog = new System.Windows.Forms.DataGridView();
+            this._colTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colLevel = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._colMessage = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this._grpLiveStatus.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._dgvLog)).BeginInit();
             this.SuspendLayout();
             //
             // _labelTitle
@@ -124,6 +134,102 @@ namespace RtmpStreamerPlugin.Admin
             this._chkAllowUntrustedCerts.UseVisualStyleBackColor = true;
             this._chkAllowUntrustedCerts.CheckedChanged += new System.EventHandler(this.OnUserChange);
             //
+            // _grpLiveStatus
+            //
+            this._grpLiveStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this._grpLiveStatus.Controls.Add(this._lblStatusLabel);
+            this._grpLiveStatus.Controls.Add(this._lblStatusValue);
+            this._grpLiveStatus.Controls.Add(this._lblStatsValue);
+            this._grpLiveStatus.Controls.Add(this._dgvLog);
+            this._grpLiveStatus.Location = new System.Drawing.Point(14, 225);
+            this._grpLiveStatus.Name = "_grpLiveStatus";
+            this._grpLiveStatus.Size = new System.Drawing.Size(500, 220);
+            this._grpLiveStatus.TabIndex = 10;
+            this._grpLiveStatus.TabStop = false;
+            this._grpLiveStatus.Text = "Live Status";
+            //
+            // _lblStatusLabel
+            //
+            this._lblStatusLabel.AutoSize = true;
+            this._lblStatusLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold);
+            this._lblStatusLabel.Location = new System.Drawing.Point(8, 20);
+            this._lblStatusLabel.Name = "_lblStatusLabel";
+            this._lblStatusLabel.Size = new System.Drawing.Size(43, 13);
+            this._lblStatusLabel.TabIndex = 0;
+            this._lblStatusLabel.Text = "Status:";
+            //
+            // _lblStatusValue
+            //
+            this._lblStatusValue.AutoSize = true;
+            this._lblStatusValue.Location = new System.Drawing.Point(60, 20);
+            this._lblStatusValue.Name = "_lblStatusValue";
+            this._lblStatusValue.Size = new System.Drawing.Size(0, 13);
+            this._lblStatusValue.TabIndex = 1;
+            //
+            // _lblStatsValue
+            //
+            this._lblStatsValue.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this._lblStatsValue.ForeColor = System.Drawing.SystemColors.GrayText;
+            this._lblStatsValue.Location = new System.Drawing.Point(8, 40);
+            this._lblStatsValue.Name = "_lblStatsValue";
+            this._lblStatsValue.Size = new System.Drawing.Size(480, 15);
+            this._lblStatsValue.TabIndex = 2;
+            //
+            // _colTime
+            //
+            this._colTime.HeaderText = "Time";
+            this._colTime.Name = "_colTime";
+            this._colTime.ReadOnly = true;
+            this._colTime.Width = 90;
+            //
+            // _colLevel
+            //
+            this._colLevel.HeaderText = "Level";
+            this._colLevel.Name = "_colLevel";
+            this._colLevel.ReadOnly = true;
+            this._colLevel.Width = 55;
+            //
+            // _colMessage
+            //
+            this._colMessage.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this._colMessage.HeaderText = "Message";
+            this._colMessage.Name = "_colMessage";
+            this._colMessage.ReadOnly = true;
+            //
+            // _dgvLog
+            //
+            this._dgvLog.AllowUserToAddRows = false;
+            this._dgvLog.AllowUserToDeleteRows = false;
+            this._dgvLog.AllowUserToResizeRows = false;
+            this._dgvLog.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this._dgvLog.BackgroundColor = System.Drawing.SystemColors.Window;
+            this._dgvLog.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this._dgvLog.CellBorderStyle = System.Windows.Forms.DataGridViewCellBorderStyle.SingleHorizontal;
+            this._dgvLog.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this._dgvLog.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this._colTime,
+            this._colLevel,
+            this._colMessage});
+            this._dgvLog.DefaultCellStyle.Font = new System.Drawing.Font("Consolas", 8.25F);
+            this._dgvLog.DefaultCellStyle.SelectionBackColor = System.Drawing.SystemColors.Window;
+            this._dgvLog.DefaultCellStyle.SelectionForeColor = System.Drawing.SystemColors.ControlText;
+            this._dgvLog.EnableHeadersVisualStyles = true;
+            this._dgvLog.GridColor = System.Drawing.SystemColors.ControlLight;
+            this._dgvLog.Location = new System.Drawing.Point(8, 60);
+            this._dgvLog.MultiSelect = false;
+            this._dgvLog.Name = "_dgvLog";
+            this._dgvLog.ReadOnly = true;
+            this._dgvLog.RowHeadersVisible = false;
+            this._dgvLog.RowTemplate.Height = 20;
+            this._dgvLog.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this._dgvLog.Size = new System.Drawing.Size(480, 150);
+            this._dgvLog.TabIndex = 3;
+            //
             // StreamConfigUserControl
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -138,8 +244,12 @@ namespace RtmpStreamerPlugin.Admin
             this.Controls.Add(this._lblRtmpExamples);
             this.Controls.Add(this._chkEnabled);
             this.Controls.Add(this._chkAllowUntrustedCerts);
+            this.Controls.Add(this._grpLiveStatus);
             this.Name = "StreamConfigUserControl";
-            this.Size = new System.Drawing.Size(530, 220);
+            this.Size = new System.Drawing.Size(530, 460);
+            this._grpLiveStatus.ResumeLayout(false);
+            this._grpLiveStatus.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this._dgvLog)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -155,5 +265,13 @@ namespace RtmpStreamerPlugin.Admin
         private System.Windows.Forms.Label _lblRtmpExamples;
         private System.Windows.Forms.CheckBox _chkEnabled;
         private System.Windows.Forms.CheckBox _chkAllowUntrustedCerts;
+        private System.Windows.Forms.GroupBox _grpLiveStatus;
+        private System.Windows.Forms.Label _lblStatusLabel;
+        private System.Windows.Forms.Label _lblStatusValue;
+        private System.Windows.Forms.Label _lblStatsValue;
+        private System.Windows.Forms.DataGridView _dgvLog;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colTime;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colLevel;
+        private System.Windows.Forms.DataGridViewTextBoxColumn _colMessage;
     }
 }
