@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Windows.Forms;
 using VideoOS.Platform;
 using VideoOS.Platform.Admin;
+using VideoOS.Platform.Messaging;
 
 namespace RtmpStreamerPlugin.Admin
 {
@@ -14,6 +16,21 @@ namespace RtmpStreamerPlugin.Admin
         public RtmpStreamerItemManager(Guid kind)
         {
             _kind = kind;
+        }
+
+        public override void Init()
+        {
+            // Pre-start MessageCommunication on a background thread so it doesn't
+            // block the UI when the user first clicks a stream item.
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    var serverId = EnvironmentManager.Instance.MasterSite.ServerId;
+                    MessageCommunicationManager.Start(serverId);
+                }
+                catch { }
+            });
         }
 
         public override void Close()
@@ -86,15 +103,6 @@ namespace RtmpStreamerPlugin.Admin
             if (!enabled)
                 return OperationalState.Disabled;
 
-            var status = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "";
-
-            if (status.StartsWith("Streaming"))
-                return OperationalState.OkActive;
-
-            if (status.StartsWith("Error") || status.StartsWith("Codec"))
-                return OperationalState.Error;
-
-            // Connecting, Reconnecting, Starting, Stopped, etc.
             return OperationalState.Ok;
         }
 
@@ -107,8 +115,7 @@ namespace RtmpStreamerPlugin.Admin
             if (!enabled)
                 return "Disabled";
 
-            var status = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "Not started";
-            return status;
+            return "See Live Status panel";
         }
 
         #endregion

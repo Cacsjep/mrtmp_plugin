@@ -173,6 +173,8 @@ namespace RtmpStreamerPlugin.Admin
             try
             {
                 var serverId = EnvironmentManager.Instance.MasterSite.ServerId;
+                // Start() is called in ItemManager.Init() on a background thread.
+                // Calling it again here is idempotent and fast if already started.
                 MessageCommunicationManager.Start(serverId);
                 _mc = MessageCommunicationManager.Get(serverId);
 

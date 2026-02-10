@@ -118,7 +118,6 @@ namespace RtmpStreamerPlugin.Background
             SystemLog.PluginStopped();
 
             StopAllHelpers();
-            WriteAllHelperStatus();
         }
 
         private void LoadAndStartStreams()
@@ -152,7 +151,6 @@ namespace RtmpStreamerPlugin.Background
 
                 _lastConfigSnapshot = GetConfigSnapshot();
                 PluginLog.Info($"Loaded streams. Active helpers: {_helpers.Count}");
-                WriteAllHelperStatus();
             }
             catch (Exception ex)
             {
@@ -221,8 +219,6 @@ namespace RtmpStreamerPlugin.Background
                             newStatus.StartsWith("Codec") ||
                             newStatus == "Stopped")
                         {
-                            helper.LastPersistableStatus = newStatus;
-
                             // Write to Milestone System Log on significant transitions
                             if (newStatus.StartsWith("Streaming") && !prev.StartsWith("Streaming"))
                                 SystemLog.StreamConnected(cameraName, rtmpUrl);
@@ -311,63 +307,6 @@ namespace RtmpStreamerPlugin.Background
                 }
             }
 
-            // Always write status so STATUS line changes propagate to item properties
-            WriteAllHelperStatus();
-        }
-
-        private void WriteAllHelperStatus()
-        {
-            try
-            {
-                var items = Configuration.Instance.GetItemConfigurations(
-                    RtmpStreamerPluginDefinition.PluginId, null, RtmpStreamerPluginDefinition.PluginKindId);
-
-                foreach (var item in items)
-                {
-                    string status;
-                    string restarts = "0";
-
-                    if (_helpers.TryGetValue(item.FQID.ObjectId, out var helper))
-                    {
-                        bool alive = false;
-                        try { alive = helper.Process != null && !helper.Process.HasExited; } catch { }
-
-                        if (!string.IsNullOrEmpty(helper.LastPersistableStatus))
-                            status = helper.LastPersistableStatus;
-                        else
-                            status = alive ? "Starting" : "Stopped";
-
-                        restarts = helper.RestartCount.ToString();
-
-                        // Only save when something actually changed
-                        if (status == helper.LastWrittenStatus && restarts == helper.LastWrittenRestarts)
-                            continue;
-
-                        item.Properties["Status"] = status;
-                        item.Properties["Restarts"] = restarts;
-
-                        helper.LastWrittenStatus = status;
-                        helper.LastWrittenRestarts = restarts;
-                    }
-                    else
-                    {
-                        // No helper running - only write "Stopped" once
-                        var existing = item.Properties.ContainsKey("Status") ? item.Properties["Status"] : "";
-                        if (existing == "Stopped")
-                            continue;
-
-                        item.Properties["Status"] = "Stopped";
-                        item.Properties["Restarts"] = "0";
-                    }
-
-                    PluginLog.Info($"Writing status for '{item.Name}': Status={item.Properties["Status"]}");
-                    Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, item);
-                }
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Error($"Error writing helper status: {ex.Message}");
-            }
         }
 
         private string GetConfigSnapshot()
@@ -513,9 +452,6 @@ namespace RtmpStreamerPlugin.Background
             public bool AllowUntrustedCerts;
             public int RestartCount;
             public volatile string LastStatus;
-            public volatile string LastPersistableStatus;
-            public string LastWrittenStatus;
-            public string LastWrittenRestarts;
             public long Frames;
             public double Fps;
             public long Bytes;
