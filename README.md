@@ -1,39 +1,16 @@
 # Milestone XProtect® RTMP Streamer Plugin (Unofficial/Independent)
 
+[![Build & Release](https://github.com/Cacsjep/mrtmp_plugin/actions/workflows/build-release.yml/badge.svg)](https://github.com/Cacsjep/mrtmp_plugin/actions/workflows/build-release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/Cacsjep/mrtmp_plugin)](https://github.com/Cacsjep/mrtmp_plugin/releases/latest)
+[![GitHub Downloads](https://img.shields.io/github/downloads/Cacsjep/mrtmp_plugin/total)](https://github.com/Cacsjep/mrtmp_plugin/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/Cacsjep/mrtmp_plugin)](https://github.com/Cacsjep/mrtmp_plugin/issues)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/Cacsjep/mrtmp_plugin/security/dependabot)
+
 > [!IMPORTANT]
 > This is an independent open source project and is **not affiliated with, endorsed by, or supported by Milestone Systems**. XProtect® is a registered trademark of Milestone Systems A/S.
 
 A Milestone XProtect® MIP plugin that streams live camera video to RTMP/RTMPS destinations. Pure H.264 passthrough from XProtect® cameras with silent AAC audio track -- no transcoding, no FFmpeg, no native dependencies.
-
-```
- ┌─────────────────────────────────────────────────────────┐
- │  Milestone XProtect® Event Server (Windows Service)     │
- │                                                         │
- │  BackgroundPlugin                                       │
- │    - Reads config from Management Server                │
- │    - Launches one helper process per stream             │
- │    - Monitors health, auto-restarts on crash            │
- │    - Writes to Milestone System Log (LogClient)         │
- │                                                         │
- │  ┌───────────────────────────────────────────────────┐  │
- │  │  RtmpStreamerHelper.exe  (standalone MIP SDK)     │  │
- │  │                                                   │  │
- │  │  RawLiveSource ──► H.264 Annex B                  │  │
- │  │       │                                           │  │
- │  │       ▼                                           │  │
- │  │  GenericByteData Parser ──► FlvMuxer ──► RTMP(S)  │  │
- │  │       │                        │                  │  │
- │  │       │               Silent AAC audio            │  │
- │  └───────────────────────┬───────────────────────────┘  │
- └──────────────────────────│──────────────────────────────┘
-                            │
-                            │  RTMP/RTMPS publish
-                            ▼
-                  ┌─────────────────────┐
-                  │  YouTube / Twitch / │
-                  │  Facebook / Custom  │
-                  └─────────────────────┘
-```
 
 ## Demo
 
@@ -106,6 +83,36 @@ When you select an enabled stream, the detail panel shows a live log at the bott
 - Log lines are color-coded: **INFO** (green), **WARN** (yellow), **ERROR** (red), **DEBUG** (gray)
 
 ## Architecture
+
+```
+ ┌─────────────────────────────────────────────────────────┐
+ │  Milestone XProtect® Event Server (Windows Service)     │
+ │                                                         │
+ │  BackgroundPlugin                                       │
+ │    - Reads config from Management Server                │
+ │    - Launches one helper process per stream             │
+ │    - Monitors health, auto-restarts on crash            │
+ │    - Writes to Milestone System Log (LogClient)         │
+ │                                                         │
+ │  ┌───────────────────────────────────────────────────┐  │
+ │  │  RtmpStreamerHelper.exe  (standalone MIP SDK)     │  │
+ │  │                                                   │  │
+ │  │  RawLiveSource ──► H.264 Annex B                  │  │
+ │  │       │                                           │  │
+ │  │       ▼                                           │  │
+ │  │  GenericByteData Parser ──► FlvMuxer ──► RTMP(S)  │  │
+ │  │       │                        │                  │  │
+ │  │       │               Silent AAC audio            │  │
+ │  └───────────────────────┬───────────────────────────┘  │
+ └──────────────────────────│──────────────────────────────┘
+                            │
+                            │  RTMP/RTMPS publish
+                            ▼
+                  ┌─────────────────────┐
+                  │  YouTube / Twitch / │
+                  │  Facebook / Custom  │
+                  └─────────────────────┘
+```
 
 The plugin consists of three components that run in different processes:
 
