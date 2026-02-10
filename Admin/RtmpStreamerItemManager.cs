@@ -96,7 +96,7 @@ namespace RtmpStreamerPlugin.Admin
             if (status.StartsWith("Error") || status.StartsWith("Codec"))
                 return OperationalState.Error;
 
-            // Stopped or no status yet
+            // Connecting, Reconnecting, Starting, Stopped, etc.
             return OperationalState.Ok;
         }
 

@@ -65,7 +65,11 @@ namespace RtmpStreamerPlugin.Background
                     MessageId.Server.ConfigurationChangedIndication,
                     RtmpStreamerPluginDefinition.PluginKindId));
 
+            SystemLog.Register();
+
             LoadAndStartStreams();
+
+            SystemLog.PluginStarted(_helpers.Count);
 
             _monitorTimer = new Timer(MonitorHelpers, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
         }
@@ -83,6 +87,8 @@ namespace RtmpStreamerPlugin.Background
                 EnvironmentManager.Instance.UnRegisterReceiver(_configMessageObj);
                 _configMessageObj = null;
             }
+
+            SystemLog.PluginStopped();
 
             StopAllHelpers();
             WriteAllHelperStatus();
@@ -173,7 +179,27 @@ namespace RtmpStreamerPlugin.Background
                     }
                     if (e.Data.StartsWith("STATUS "))
                     {
-                        helper.LastStatus = e.Data.Substring(7);
+                        var newStatus = e.Data.Substring(7);
+                        // Only persist significant state changes to avoid constant config saves.
+                        // Transient states (Connecting, Reconnecting, Initializing, Waiting)
+                        // stay in logs but don't update the item property.
+                        if (newStatus.StartsWith("Streaming") ||
+                            newStatus.StartsWith("Error") ||
+                            newStatus.StartsWith("Codec") ||
+                            newStatus == "Stopped")
+                        {
+                            var prev = helper.LastStatus ?? "";
+                            helper.LastStatus = newStatus;
+
+                            // Write to Milestone System Log on significant transitions
+                            if (newStatus.StartsWith("Streaming") && !prev.StartsWith("Streaming"))
+                                SystemLog.StreamConnected(cameraName, rtmpUrl);
+                            else if ((newStatus.StartsWith("Error") || newStatus.StartsWith("Codec")) &&
+                                     !prev.StartsWith("Error") && !prev.StartsWith("Codec"))
+                                SystemLog.StreamError(cameraName, newStatus);
+                            else if (newStatus == "Stopped" && prev != "Stopped")
+                                SystemLog.StreamStopped(cameraName);
+                        }
                         return;
                     }
                     PluginLog.Info($"[Helper:{cameraName}] {e.Data}");
@@ -231,11 +257,11 @@ namespace RtmpStreamerPlugin.Background
                     if (helper.Process == null || helper.Process.HasExited)
                     {
                         var exitCode = helper.Process?.ExitCode ?? -1;
-                        PluginLog.Info($"Helper died (exit={exitCode}): {helper.CameraName}, restart #{helper.RestartCount + 1}");
+                        var restartCount = helper.RestartCount + 1;
+                        PluginLog.Info($"Helper died (exit={exitCode}): {helper.CameraName}, restart #{restartCount}");
+                        SystemLog.HelperCrashed(helper.CameraName, restartCount);
 
                         try { helper.Process?.Dispose(); } catch { }
-
-                        var restartCount = helper.RestartCount + 1;
                         LaunchHelper(itemId, helper.CameraId, helper.CameraName, helper.RtmpUrl, helper.AllowUntrustedCerts);
 
                         if (_helpers.TryGetValue(itemId, out var newHelper))
@@ -297,6 +323,7 @@ namespace RtmpStreamerPlugin.Background
                         item.Properties["Restarts"] = "0";
                     }
 
+                    PluginLog.Info($"Writing status for '{item.Name}': Status={item.Properties["Status"]}");
                     Configuration.Instance.SaveItemConfiguration(RtmpStreamerPluginDefinition.PluginId, item);
                 }
             }

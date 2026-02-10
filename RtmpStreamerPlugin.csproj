@@ -76,6 +76,7 @@
     <Compile Include="Rtmp\FlvMuxer.cs" />
     <Compile Include="Rtmp\SilentAacGenerator.cs" />
     <Compile Include="Rtmp\RtmpChunkWriter.cs" />
+    <Compile Include="SystemLog.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="plugin.def">
