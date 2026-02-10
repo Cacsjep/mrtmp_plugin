@@ -35,6 +35,10 @@ A Milestone XProtect® MIP plugin that streams live camera video to RTMP/RTMPS d
                   └─────────────────────┘
 ```
 
+## Demo
+
+https://github.com/user-attachments/assets/dbdcbe12-9d3f-43e5-a263-813a289ad126
+
 ## Features
 
 - **H.264 passthrough** -- no transcoding, direct from XProtect® camera to RTMP server
